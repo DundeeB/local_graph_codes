@@ -140,10 +140,14 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.savefig('graphs/orientation_and_position_corr')
 
 
-def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bonds=True, quiv=True, *args, **kwargs):
+def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bonds=True, quiv=True,
+                  orientational_rad=None, *args, **kwargs):
     plt.rcParams.update({'figure.figsize': (15, 8)})
     plt.figure()
-    op_dir = op_path(rhoH, 'burger_vectors', *args, **kwargs)
+    op_name = 'burger_vectors'
+    if orientational_rad is not None:
+        op_name += '_orientation_rad=' + str(orientational_rad)
+    op_dir = op_path(rhoH, op_name, *args, **kwargs)
     # op_dir = op_path(rhoH, 'burger_vectors_orientation_rad=10.0', *args, **kwargs)
     sim = join(sims_dir, sim_name(rhoH, *args, **kwargs))
     if realization is None:
@@ -319,7 +323,7 @@ def quiver_cleaned_burgers(rhoH, realization=None, pair_cleans_iterations=1, cut
         if os.path.exists(clean_path) and not overwrite_cluster_clean:
             burg = np.loadtxt(clean_path)
         else:
-            burg = clean_by_cluster(burg[:], cluster_algorithm, **cluster_args)
+            burg = clean_by_cluster(burg, cluster_algorithm, **cluster_args)
             np.savetxt(clean_path, burg)
     plt.quiver(burg[:, 0], burg[:, 1], burg[:, 2], burg[:, 3], angles='xy', scale_units='xy', scale=1,
                label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
@@ -327,14 +331,14 @@ def quiver_cleaned_burgers(rhoH, realization=None, pair_cleans_iterations=1, cut
         plt.xlim(xlim)
     if len(ylim) > 0:
         plt.ylim(ylim)
-    if color_by_cluster:
+    if color_by_cluster and clean_by_cluster_flag:
         coarse_grained_burgers = plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH,
                                                  save_name='cluster_' + clean_name,
                                                  **cluster_args)
-    plt.savefig('graphs/cleaned_burger_vectors')
-    if color_by_cluster:
+
+    if color_by_cluster and clean_by_cluster_flag:
         plt.figure()
-        plt.hist(coarse_grained_burgers, np.array(range(max(coarse_grained_burgers)))+0.5)
+        plt.hist(coarse_grained_burgers, np.array(range(max(coarse_grained_burgers))) + 0.5)
         print(coarse_grained_burgers)
     return
 
@@ -669,23 +673,25 @@ def coarse_grain_burgers(rhoH, realization):
     # TODO: Refference histogram for randomally placed Burgers vectors of unit magnitude which goes through all the
     #  post process I run on these codes for bias testing
     # TODO: add frustration, maybe then seeing there is no frustration between clusters...
-    rhoH = 0.8
     write_or_load = WriteOrLoad(join(sims_dir, sim_name(rhoH)))
     l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
     cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x / 2, l_y / 2])
-    quiver_cleaned_burgers(rhoH, realization=64155333, pair_cleans_iterations=3,
-                           clean_by_cluster_flag=True, cluster_algorithm=AgglomerativeClustering,
+    quiver_cleaned_burgers(rhoH, realization=realization, pair_cleans_iterations=0,
+                           clean_by_cluster_flag=False, cluster_algorithm=AgglomerativeClustering,
                            cluster_args={'distance_threshold': 3, 'compute_full_tree': True, 'n_clusters': None,
                                          'linkage': 'single',
                                          'affinity': (lambda X: pairwise_distances(X, metric=cyc))},
-                           color_by_cluster=True)
+                           color_by_cluster=True, overwrite_cluster_clean=True)
 
 
 if __name__ == "__main__":
     # plot_pos_and_orientation([0.85, 0.83, 0.8], [0.8, 0.78, 0.77])
     rhoH, realization = 0.8, 64155333
     # quiver_burger(rhoH, [85, 106.7], [126, 140.1], realization=realization, bonds=True, quiv=False)
-    coarse_grain_burgers(rhoH, realization)
+    # quiver_burger(rhoH, [120, 170], [60, 90], realization=realization, bonds=True, quiv=True)
+    quiver_burger(rhoH, [0, 30], [0, 30], bonds=False, quiv=True, N=1e4, orientational_rad=10)
+    quiver_burger(rhoH, [0, 30], [0, 30], bonds=False, quiv=True, N=1e4)
+    # coarse_grain_burgers(rhoH, realization)
 
     # plot_ising([0.85, 0.8, 0.75], rhoH_anneal=0.8, plot_heat_capcity=True)
 
