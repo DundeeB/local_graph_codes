@@ -18,7 +18,7 @@ size = 30
 params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size, 'axes.titlesize': size,
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
-colors_rho = {0.85: 'C0', 0.83: 'C1', 0.8: 'C2', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
+colors_rho = {0.85: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C2', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
               0.75: 'C7'}
 
 
@@ -141,7 +141,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
 
 
 def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bonds=True, quiv=True,
-                  orientational_rad=None, *args, **kwargs):
+                  orientational_rad=None, plot_centers=True, quiv_surfix='', *args, **kwargs):
     plt.rcParams.update({'figure.figsize': (15, 8)})
     plt.figure()
     op_name = 'burger_vectors'
@@ -155,9 +155,10 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
         realization = reals[0]
         file = files[0]
     else:
-        file = 'vec_' + str(realization) + '.txt'
+        file = 'vec_' + str(realization) + quiv_surfix + '.txt'
     spheres = np.loadtxt(join(sim, str(realization)))
-    if bonds:
+    any_bonds = bonds or frustrated_bonds
+    if any_bonds:
         op = Ising(sim_path=sim, k_nearest_neighbors=4, directed=False)
         op.update_centers(spheres, realization)
         spheres = op.spheres  # might reogranize order
@@ -168,7 +169,7 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
         [(z_ > np.mean(z)) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
     down = np.array(
         [(z_ <= np.mean(z)) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
-    if bonds:
+    if any_bonds:
         op.initialize(random_initialization=False, J=-1)
         spins = op.z_spins
         for i in range(len(x)):
@@ -181,20 +182,23 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
                     continue
                 if spins[i] * spins[j] > 0 and frustrated_bonds:
                     plt.plot(ex, ey, color='green', linewidth=3)
-                if spins[i] * spins[j] < 0:
+                if spins[i] * spins[j] < 0 and bonds:
                     plt.plot(ex, ey, color='lightgray')
-    # plt.plot(x[up], y[up], '.', color='orange', label='up', markersize=10)
-    plt.plot(x[up], y[up], '.r', label='up', markersize=10)
-    plt.plot(x[down], y[down], '.b', label='down', markersize=10)
-    plt.axis('equal')
-    # plt.legend()
+    if plot_centers:
+        # plt.plot(x[up], y[up], '.', color='orange', label='up', markersize=10)
+        plt.plot(x[up], y[up], '.r', label='up', markersize=10)
+        plt.plot(x[down], y[down], '.b', label='down', markersize=10)
     if quiv:
         burg = np.loadtxt(join(op_dir, file)) / 2
-        I_box = np.array(
-            [xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_) in zip(burg[:, 0], burg[:, 1])])
-        burg = burg[I_box, :]
+        if len(xlim)>0 and len(ylim)>0:
+            I_box = np.array(
+                [xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_) in zip(burg[:, 0], burg[:, 1])])
+            burg = burg[I_box, :]
         plt.quiver(burg[:, 0], burg[:, 1], burg[:, 2], burg[:, 3], angles='xy', scale_units='xy', scale=1,
                    label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
+
+    plt.axis('equal')
+    # plt.legend()
     plt.savefig('graphs/burger_vectors')
     return
 
@@ -327,7 +331,7 @@ def quiver_cleaned_burgers(rhoH, realization=None, pair_cleans_iterations=1, cut
     if color_by_cluster:
         cluster_parity = plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH, **cluster_args)
         plt.figure()
-        plt.hist(cluster_parity, np.array(range(max(cluster_parity)+1)) + 0.5)
+        plt.hist(cluster_parity, np.array(range(max(cluster_parity) + 1)) + 0.5)
         plt.xlabel('$|\\vec{b}|^2$')
         plt.ylabel('Histogram for Burgers cluster sum')
         print(cluster_parity)
@@ -667,14 +671,14 @@ def coarse_grain_burgers(rhoH, xlim=[], ylim=[], realization=None, max_pair_clea
     cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x / 2, l_y / 2])
     cluster_args['affinity'] = lambda X: pairwise_distances(X, metric=cyc)
     cluster_args['distance_threshold'] = distance_threshold
-    # for pair_cleans_iterations in range(max_pair_cleans_iterations + 1):
-    #     quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
-    #                            pair_cleans_iterations=pair_cleans_iterations, clean_by_cluster_flag=False)
+    for pair_cleans_iterations in range(max_pair_cleans_iterations + 1):
+        quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
+                               pair_cleans_iterations=pair_cleans_iterations, clean_by_cluster_flag=False)
     if clean_by_cluster_flag:
-        # burg = quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
-        #                               pair_cleans_iterations=max_pair_cleans_iterations, clean_by_cluster_flag=False)
-        # plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH, **cluster_args)
-        # plt.title('Clustering')
+        burg = quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
+                                      pair_cleans_iterations=max_pair_cleans_iterations, clean_by_cluster_flag=False)
+        plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH, **cluster_args)
+        plt.title('Clustering')
         quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
                                pair_cleans_iterations=max_pair_cleans_iterations,
                                clean_by_cluster_flag=True, cluster_algorithm=cluster_algorithm,
@@ -683,23 +687,24 @@ def coarse_grain_burgers(rhoH, xlim=[], ylim=[], realization=None, max_pair_clea
 
 
 if __name__ == "__main__":
-    # plot_pos_and_orientation([0.85, 0.83, 0.8], [0.8, 0.78, 0.77])
-    rhoH, realization = 0.81, 94363239  # 0.8, 64155333  # 92549977  #
-    # quiver_burger(rhoH, [85, 106.7], [126, 140.1], realization=realization, bonds=True, quiv=False)
-    # quiver_burger(rhoH, [120, 170], [60, 90], realization=realization, bonds=True, quiv=True)
-    xlim, ylim = [120, 170], [60, 90]
+    rhoH, realization = 0.81, 92347176  # 94363239  # 0.8, 64155333  # 92549977  #
+    # xlim, ylim = [120, 147], [30, 46]
+    xlim, ylim = [], []
+    quiver_burger(rhoH, xlim, ylim, realization=realization, bonds=False, quiv=True, plot_centers=False,
+                  quiv_surfix='_cluster-cleaned')
     # for rad in [None, 10, 5, 2, 0]:
     #     quiver_burger(rhoH, xlim, ylim, bonds=False, quiv=True, realization=realization, orientational_rad=rad)
-    coarse_grain_burgers(rhoH, realization=realization, distance_threshold=5, overwrite_cluster_clean=True,
-                         xlim=[0, 260], ylim=[0, 260], max_pair_cleans_iterations=0)
+    # coarse_grain_burgers(rhoH, realization=realization, distance_threshold=5, overwrite_cluster_clean=False,
+    #                      xlim=[0, 260], ylim=[0, 260])
 
-    # plot_ising([0.85, 0.8, 0.75], rhoH_anneal=0.8, plot_heat_capcity=True)
-
-    # plot_local_psi_hist([0.8, 0.785, 0.78, 0.775, 0.77])
-    # plot_magnetic_corr([0.85, 0.83, 0.8, 0.77])
-    # plot_bragg_peak(0.8)
-    # plot_annealing(0.8, real=45738368)
-    # plot_psi_convergence([0.83, 0.8, 0.78])
+    # plot_pos_and_orientation([0.85, 0.83, rhoH], [rhoH, 0.78, 0.77])
+    # plot_ising([0.85, rhoH, 0.75], rhoH_anneal=rhoH, plot_heat_capcity=True)
+    #
+    # plot_local_psi_hist([rhoH, 0.785, 0.78, 0.775, 0.77])
+    # plot_magnetic_corr([0.85, 0.83, rhoH, 0.77])
+    # plot_bragg_peak(rhoH)
+    # plot_annealing(rhoH, real=realization)
+    # plot_psi_convergence([0.83, rhoH, 0.78])
     print('Finished succesfully')
 #     TODO: recreate all graphs for rhoH=0.81, which looks much finer
 
