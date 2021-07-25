@@ -18,8 +18,8 @@ size = 30
 params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size, 'axes.titlesize': size,
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
-colors_rho = {0.85: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C2', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7'}
+colors_rho = {0.85: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
+              0.75: 'C7', 0.79: 'C8'}
 
 
 def join(*args, **kwargs):
@@ -40,7 +40,7 @@ def op_path(rhoH, specif_op=None, *args, **kwargs):
 
 def sort_prefix(folder_path, prefix='correlation_', surfix='.txt', reverse=True):
     relevent_files = [file for file in os.listdir(folder_path) if file.startswith(prefix) and file.endswith(surfix)]
-    reals = [int(re.split('\.', re.split('_', file)[1])[0]) for file in relevent_files]
+    reals = [int(re.split('\.', re.split('_', file)[-1])[0]) for file in relevent_files]
     sorted_files = [f for _, f in sorted(zip(reals, relevent_files), reverse=reverse)]
     sorted_reals = sorted(reals, reverse=reverse)
     return sorted_files, sorted_reals
@@ -51,11 +51,13 @@ def prepare_lbl(lbl):
     lbl = re.sub('rhoH', '$\\\\rho_H$', lbl)
     if lbl.startswith('psi'):
         for mn in ['14', '23', '16', '4', '6']:
-            lbl = re.sub('psi ' + mn, '$g_{' + mn + '}$', lbl)
+            lbl = re.sub('psi ' + mn, 'Orientational', lbl)
+            # lbl = re.sub('psi ' + mn, '$g_{' + mn + '}$', lbl)
     if lbl.startswith('Bragg Sm'):
         lbl = re.sub('Bragg Sm', '$g_k^M$', lbl)
     if lbl.startswith('Bragg S'):
-        lbl = re.sub('Bragg S', '$g_k$', lbl)
+        lbl = re.sub('Bragg S', 'Positional', lbl)
+        # lbl = re.sub('Bragg S', '$g_k$', lbl)
     for N, N_ in zip(['10000', '40000', '90000'], ['1e4', '4e4', '9e4']):
         lbl = re.sub(N, N_, lbl)
     return lbl
@@ -130,7 +132,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     # ax.legend_ = None
 
     plt.subplot(212)
-    plot_corr(rhos_psi, 'psi_14', poly_slope=0.25, N=4e4)
+    plot_corr(rhos_psi, 'psi_14', poly_slope=0.25)
     plt.ylim(corr_ylim)
     plt.xlim(corr_xlim)
     plt.ylabel(prepare_lbl('psi_4'))
@@ -164,11 +166,15 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
         spheres = op.spheres  # might reogranize order
     x = spheres[:, 0] / 2
     y = spheres[:, 1] / 2
-    z = spheres[:, 2] / 2
-    up = np.array(
-        [(z_ > np.mean(z)) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
-    down = np.array(
-        [(z_ <= np.mean(z)) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
+    z = (spheres[:, 2] - np.mean(spheres[:, 2])) / 2
+    if len(xlim) > 0 and len(ylim) > 0:
+        up = np.array(
+            [(z_ > 0) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
+        down = np.array(
+            [(z_ <= 0) and xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_, z_) in zip(x, y, z)])
+    else:
+        up = np.array([(z_ > np.mean(z)) for z_ in z])
+        down = np.array([(z_ <= np.mean(z)) for z_ in z])
     if any_bonds:
         op.initialize(random_initialization=False, J=-1)
         spins = op.z_spins
@@ -186,16 +192,16 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
                     plt.plot(ex, ey, color='lightgray')
     if plot_centers:
         # plt.plot(x[up], y[up], '.', color='orange', label='up', markersize=10)
-        plt.plot(x[up], y[up], '.r', label='up', markersize=10)
-        plt.plot(x[down], y[down], '.b', label='down', markersize=10)
+        plt.plot(x[up], y[up], '.r', label='up', markersize=50)
+        plt.plot(x[down], y[down], '.b', label='down', markersize=50)
     if quiv:
-        burg = np.loadtxt(join(op_dir, file)) / 2
-        if len(xlim)>0 and len(ylim)>0:
+        burg = np.loadtxt(join(op_dir, file))
+        if len(xlim) > 0 and len(ylim) > 0:
             I_box = np.array(
-                [xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_) in zip(burg[:, 0], burg[:, 1])])
+                [xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_) in zip(burg[:, 0] / 2, burg[:, 1] / 2)])
             burg = burg[I_box, :]
-        plt.quiver(burg[:, 0], burg[:, 1], burg[:, 2], burg[:, 3], angles='xy', scale_units='xy', scale=1,
-                   label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
+        plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy',
+                   scale=1, label='Burger field', width=3e-3, zorder=7)
 
     plt.axis('equal')
     # plt.legend()
@@ -210,132 +216,6 @@ def cyc_dist(p1, p2, boundaries):
         L = boundaries[i]
         dsq += min(dx[i] ** 2, (dx[i] + L) ** 2, (dx[i] - L) ** 2)  # find shorter path through B.D.
     return np.sqrt(dsq)
-
-
-def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
-    # save graph into real num with 000 to differentiate from usual graph saves.
-    write_or_load = WriteOrLoad(sim_path)
-    l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
-    cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x / 2, l_y / 2])
-    graph = kneighbors_graph(burg[:, :2], n_neighbors=1, metric=cyc)
-    I, J, _ = scipy.sparse.find(graph)[:]
-    Ed = [(i, j) for (i, j) in zip(I, J)]
-    Eud = []
-    N = len(burg)
-    udgraph = scipy.sparse.csr_matrix((N, N))
-    for i, j in Ed:
-        if ((j, i) in Ed) and ((i, j) not in Eud) and ((j, i) not in Eud):
-            Eud.append((i, j))
-            udgraph[i, j] = 1
-            udgraph[j, i] = 1
-    graph = udgraph
-    nearest_neighbor = [[j for j in graph.getrow(i).indices] for i in range(N)]
-    cleaned_burg = []
-    for i in range(N):
-        r1 = np.array([burg[i, 0], burg[i, 1]])
-        b1 = np.array([burg[i, 2], burg[i, 3]])
-        if len(nearest_neighbor[i]) == 0:
-            cleaned_burg.append([r1[0], r1[1], b1[0], b1[1]])
-            continue
-        j = nearest_neighbor[i][0]
-        if i > j:
-            continue
-        r2 = [burg[j, 0], burg[j, 1]]
-        b2 = [burg[j, 2], burg[j, 3]]
-        if cyc(r1, r2) > cutoff or np.linalg.norm(b1 + b2) > 1e-5:
-            cleaned_burg.append([r1[0], r1[1], b1[0], b1[1]])
-            cleaned_burg.append([r2[0], r2[1], b2[0], b2[1]])
-    return np.array(cleaned_burg)
-
-
-def clean_by_cluster(burg, algorithm, *args, **kwargs):
-    model = algorithm(*args, **kwargs)
-    try:
-        model.fit(burg[:, :2])
-        yhat = model.predict(burg[:, :2])
-    except AttributeError:
-        yhat = model.fit_predict(burg[:, :2])
-    clusters = np.unique(yhat)
-    clean_burgers = []
-    for cluster_ind in clusters:
-        cluster = np.where(yhat == cluster_ind)[0]
-        if np.linalg.norm(np.sum(burg[cluster, 2:])) > 1e-5:
-            for dislocation_ind in cluster:
-                clean_burgers.append([burg[dislocation_ind, i] for i in range(4)])
-    return np.array(clean_burgers)
-
-
-def plot_clustering(burgers, algorithm, rhoH=None, *args, **kwargs):
-    X = burgers[:, :2]
-    model = algorithm(*args, **kwargs)
-    try:
-        model.fit(X)
-        yhat = model.predict(X)
-    except AttributeError:
-        yhat = model.fit_predict(X)
-    clusters = np.unique(yhat)
-    cluster_parity = []
-    a = min([np.linalg.norm(b) for b in burgers[:, 2:4]])
-    for cluster in clusters:
-        row_ix = np.where(yhat == cluster)
-        sum_b = np.sum(burgers[row_ix, 2:4], 0)
-        cluster_parity.append(int(np.linalg.norm(sum_b) ** 2 / a ** 2))
-        if cluster_parity[-1] % 2 == 0:
-            plt.scatter(X[row_ix, 0], X[row_ix, 1])
-        else:
-            plt.scatter(X[row_ix, 0], X[row_ix, 1], marker='*')
-    return np.array(cluster_parity)
-
-
-def quiver_cleaned_burgers(rhoH, realization=None, pair_cleans_iterations=1, cutoff=10, xlim=[], ylim=[],
-                           overwrite_pair_cleaning=False, clean_by_cluster_flag=False, cluster_algorithm=None,
-                           cluster_args={}, overwrite_cluster_clean=True, color_by_cluster=False, *args, **kwargs):
-    plt.rcParams.update({'figure.figsize': (15, 8)})
-    plt.figure()
-    op_dir = op_path(rhoH, 'burger_vectors', *args, **kwargs)
-    # op_dir = op_path(rhoH, 'burger_vectors_orientation_rad=10.0', *args, **kwargs)
-    sim = join(sims_dir, sim_name(rhoH, *args, **kwargs))
-    if realization is None:
-        files, reals = sort_prefix(op_dir, 'vec_')
-        realization = reals[0]
-        file = files[0]
-    else:
-        file = 'vec_' + str(realization) + '.txt'
-    plt.axis('equal')
-    # plt.legend()
-    burg = np.loadtxt(join(op_dir, file)) / 2
-    for i in range(pair_cleans_iterations):
-        clean_path = join(op_dir, 'vec_' + str(realization) + '_pair-cleaned-' + str(i + 1) + '-times.txt')
-        if os.path.exists(clean_path) and not overwrite_pair_cleaning:
-            burg = np.loadtxt(clean_path)
-        else:
-            burg = clean_bound_pairs(burg, sim, cutoff=cutoff)
-            np.savetxt(clean_path, burg)
-    if clean_by_cluster_flag:
-        clean_name = 'vec_' + str(realization) + '_cluster-cleaned.txt'
-        clean_path = join(op_dir, clean_name)
-        if os.path.exists(clean_path) and (not overwrite_cluster_clean):
-            burg = np.loadtxt(clean_path)
-        else:
-            burg = clean_by_cluster(burg, cluster_algorithm, **cluster_args)
-            np.savetxt(clean_path, burg)
-    plt.quiver(burg[:, 0], burg[:, 1], burg[:, 2], burg[:, 3], angles='xy', scale_units='xy', scale=1,
-               label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
-    plt.title(('Microscopic Burgers' if pair_cleans_iterations == 0
-               else ('Pair Cleaned ' + str(pair_cleans_iterations) + ' times')) + \
-              ('' if (not clean_by_cluster_flag) else ', cluster cleaned'))
-    if len(xlim) > 0:
-        plt.xlim(xlim)
-    if len(ylim) > 0:
-        plt.ylim(ylim)
-    if color_by_cluster:
-        cluster_parity = plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH, **cluster_args)
-        plt.figure()
-        plt.hist(cluster_parity, np.array(range(max(cluster_parity) + 1)) + 0.5)
-        plt.xlabel('$|\\vec{b}|^2$')
-        plt.ylabel('Histogram for Burgers cluster sum')
-        print(cluster_parity)
-    return burg
 
 
 def plt_cv(rhoH, *args, **kwargs):
@@ -641,19 +521,28 @@ def converge_psi(rhoH, *args, **kwargs):
 
 
 def plot_psi_convergence(rhos):
+    # params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size,
+    #           'axes.titlesize': size,
+    #           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
     plt.rcParams.update(params)
-    plt.rcParams.update({'figure.figsize': (10, 10)})
+    plt.rcParams.update({'figure.figsize': (10, 10), 'legend.fontsize': size * 0.6})
     plt.figure()
     default_plt_kwargs['linewidth'] = 5
 
     def plt_rho(rho, label, s='-', **keywargs):
-        psi_avg, reals = converge_psi(rho, **keywargs)
-        plt.semilogx(reals, psi_avg, s + colors_rho[rho], label=label,
-                     **default_plt_kwargs)
+        fname = join(op_path(rho, specif_op='psi_14', **keywargs), 'local_mean_vs_real.txt')
+        try:
+            reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
+        except:
+            psi_avg, reals = converge_psi(rho, **keywargs)
+            np.savetxt(fname, np.array([reals, psi_avg]).T)
+        plt.semilogx(reals, psi_avg, s + colors_rho[rho], label=label, **default_plt_kwargs)
 
     for rho in rhos:
         plt_rho(rho, prepare_lbl('rhoH=' + str(rho)) + ', N=9e4, square ic')
         plt_rho(rho, 'N=4e4, honeycomb ic', s='--', initial_conditions='AF_triangle', N=4e4)
+        # plt_rho(rho, prepare_lbl('rhoH=' + str(rho)) + ', square ic')
+        # plt_rho(rho, 'honeycomb ic', s='--', initial_conditions='AF_triangle')
     plt.legend(loc=1)
     plt.xlabel('realization')
     plt.ylabel('$|\\overline{\\psi_{4}}|$')
@@ -662,50 +551,228 @@ def plot_psi_convergence(rhos):
     plt.savefig('graphs/psi_convergence')
 
 
-def coarse_grain_burgers(rhoH, xlim=[], ylim=[], realization=None, max_pair_cleans_iterations=4,
-                         clean_by_cluster_flag=True, cluster_algorithm=AgglomerativeClustering, distance_threshold=3,
-                         cluster_args={'compute_full_tree': True, 'n_clusters': None, 'linkage': 'single'},
-                         color_by_cluster=True, overwrite_cluster_clean=False):
-    write_or_load = WriteOrLoad(join(sims_dir, sim_name(rhoH)))
+def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
+    # save graph into real num with 000 to differentiate from usual graph saves.
+    write_or_load = WriteOrLoad(sim_path)
     l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
-    cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x / 2, l_y / 2])
+    cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x, l_y])
+    graph = kneighbors_graph(burg[:, :2], n_neighbors=1, metric=cyc)
+    I, J, _ = scipy.sparse.find(graph)[:]
+    Ed = [(i, j) for (i, j) in zip(I, J)]
+    Eud = []
+    N = len(burg)
+    udgraph = scipy.sparse.csr_matrix((N, N))
+    for i, j in Ed:
+        if ((j, i) in Ed) and ((i, j) not in Eud) and ((j, i) not in Eud):
+            Eud.append((i, j))
+            udgraph[i, j] = 1
+            udgraph[j, i] = 1
+    graph = udgraph
+    nearest_neighbor = [[j for j in graph.getrow(i).indices] for i in range(N)]
+    cleaned_burg = []
+    for i in range(N):
+        r1 = np.array([burg[i, 0], burg[i, 1]])
+        b1 = np.array([burg[i, 2], burg[i, 3]])
+        if len(nearest_neighbor[i]) == 0:
+            cleaned_burg.append([r1[0], r1[1], b1[0], b1[1]])
+            continue
+        j = nearest_neighbor[i][0]
+        if i > j:
+            continue
+        r2 = [burg[j, 0], burg[j, 1]]
+        b2 = [burg[j, 2], burg[j, 3]]
+        if cyc(r1, r2) > cutoff or np.linalg.norm(b1 + b2) > 1e-5:
+            cleaned_burg.append([r1[0], r1[1], b1[0], b1[1]])
+            cleaned_burg.append([r2[0], r2[1], b2[0], b2[1]])
+    return np.array(cleaned_burg)
+
+
+def clean_by_cluster(burg, algorithm, *args, **kwargs):
+    model = algorithm(*args, **kwargs)
+    try:
+        model.fit(burg[:, :2])
+        yhat = model.predict(burg[:, :2])
+    except AttributeError:
+        yhat = model.fit_predict(burg[:, :2])
+    clusters = np.unique(yhat)
+    clean_burgers = []
+    for cluster_ind in clusters:
+        cluster = np.where(yhat == cluster_ind)[0]
+        if np.linalg.norm(np.sum(burg[cluster, 2:], 0)) > 1e-5:
+            for dislocation_ind in cluster:
+                clean_burgers.append([burg[dislocation_ind, i] for i in range(4)])
+    return np.array(clean_burgers)
+
+
+def plot_clustering(burg, algorithm, *args, **kwargs):
+    X = burg[:, :2]
+    model = algorithm(*args, **kwargs)
+    try:
+        model.fit(X)
+        yhat = model.predict(X)
+    except AttributeError:
+        yhat = model.fit_predict(X)
+    clusters = np.unique(yhat)
+    cluster_parity = []
+    a = min([np.linalg.norm(b) for b in burg[:, 2:]])
+    for cluster in clusters:
+        row_ix = np.where(yhat == cluster)[0]
+        sum_b = np.sum(burg[row_ix, 2:4], 0)
+        cluster_parity.append(int(np.round(np.linalg.norm(sum_b / a) ** 2)))
+        if cluster_parity[-1] % 2 == 0:
+            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '.', markersize=15)
+        else:
+            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '*', markersize=15)
+    return np.array(cluster_parity)
+
+
+def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1, cutoff=np.inf, xlim=[], ylim=[],
+                           overwrite_pair_cleaning=False, clean_by_cluster_flag=False, cluster_algorithm=None,
+                           cluster_args={}, overwrite_cluster_clean=True, color_by_cluster=False,
+                           pair_cluster_iterations=1, sim_folder=None, *args, **kwargs):
+    plt.rcParams.update({'figure.figsize': (15, 8)})
+    plt.figure()
+    sim = join(sims_dir, sim_name(rhoH, *args, **kwargs) if sim_folder is None else sim_folder)
+    op_dir = join(sim, 'OP', 'burger_vectors')
+    if realization is None:
+        files, reals = sort_prefix(op_dir, 'vec_')
+        realization = reals[0]
+        file = files[0]
+    else:
+        file = 'vec_' + str(realization) + '.txt'
+    plt.axis('equal')
+    # plt.legend()
+    burg = np.loadtxt(join(op_dir, file))
+    name = 'vec_' + str(realization)
+    for k in range(pair_cluster_iterations):
+        nom_name = name
+        for i in range(pair_cleans_iterations):
+            name = nom_name + '_paired-' + str(i + 1)
+            clean_path = join(op_dir, name + '.txt')
+            if os.path.exists(clean_path) and not overwrite_pair_cleaning:
+                burg = np.loadtxt(clean_path)
+            else:
+                burg = clean_bound_pairs(burg, sim, cutoff=cutoff)
+                np.savetxt(clean_path, burg)
+        if clean_by_cluster_flag:
+            name += '_clustered-D=' + str(int(cluster_args['distance_threshold']))
+            clean_path = join(op_dir, name + '.txt')
+            if os.path.exists(clean_path) and (not overwrite_cluster_clean):
+                burg = np.loadtxt(clean_path)
+            else:
+                burg = clean_by_cluster(burg, cluster_algorithm, **cluster_args)
+                np.savetxt(clean_path, burg)
+    plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy', scale=1,
+               label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
+    plt.title(('Microscopic Burgers' if pair_cleans_iterations == 0
+               else ('Pair Cleaned ' + str(pair_cleans_iterations) + ' times')) + \
+              ('' if (not clean_by_cluster_flag) else ', cluster cleaned D=' + str(int(
+                  cluster_args['distance_threshold'] / 2))) + (
+                  '' if pair_cluster_iterations == 1 else 'pairs+cluster iterated ' + str(pair_cluster_iterations)))
+    if len(xlim) > 0:
+        plt.xlim(xlim)
+    if len(ylim) > 0:
+        plt.ylim(ylim)
+    if color_by_cluster:
+        cluster_parity = plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
+        plt.figure()
+        plt.hist(cluster_parity, np.array(range(max(cluster_parity) + 1)) + 0.5)
+        plt.xlim([0, 9])
+        plt.xlabel('$|\\vec{b}|^2$')
+        plt.ylabel('Histogram for Burgers cluster sum')
+        print(cluster_parity)
+    return burg
+
+
+def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair_cleans_iterations=4,
+                         clean_by_cluster_flag=True, cluster_algorithm=AgglomerativeClustering, distance_threshold=10,
+                         cluster_args={'compute_full_tree': True, 'n_clusters': None, 'linkage': 'single'},
+                         color_by_cluster=True, overwrite_cluster_clean=False, sim_folder=None):
+    write_or_load = WriteOrLoad(join(sims_dir, sim_name(rhoH) if sim_folder is None else sim_folder))
+    l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
+    cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x, l_y])
     cluster_args['affinity'] = lambda X: pairwise_distances(X, metric=cyc)
     cluster_args['distance_threshold'] = distance_threshold
+    name = None
+    kwargs = {'rhoH': rhoH, 'xlim': xlim, 'ylim': ylim, 'realization': realization,
+              'clean_by_cluster_flag': False, 'cluster_algorithm': cluster_algorithm, 'cluster_args': cluster_args,
+              'overwrite_cluster_clean': overwrite_cluster_clean, 'sim_folder': sim_folder}
     for pair_cleans_iterations in range(max_pair_cleans_iterations + 1):
-        quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
-                               pair_cleans_iterations=pair_cleans_iterations, clean_by_cluster_flag=False)
+        kwargs['pair_cleans_iterations'] = pair_cleans_iterations
+        burg = quiver_cleaned_burgers(**kwargs)
     if clean_by_cluster_flag:
-        burg = quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
-                                      pair_cleans_iterations=max_pair_cleans_iterations, clean_by_cluster_flag=False)
-        plot_clustering(burg, algorithm=cluster_algorithm, rhoH=rhoH, **cluster_args)
-        plt.title('Clustering')
-        quiver_cleaned_burgers(rhoH, xlim=xlim, ylim=ylim, realization=realization,
-                               pair_cleans_iterations=max_pair_cleans_iterations,
-                               clean_by_cluster_flag=True, cluster_algorithm=cluster_algorithm,
-                               cluster_args=cluster_args,
-                               color_by_cluster=color_by_cluster, overwrite_cluster_clean=overwrite_cluster_clean)
+        quiver_cleaned_burgers(**kwargs)
+        plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
+        plt.title('Clustering D=' + str(np.roumd(distance_threshold / 2, 1)))
+        kwargs['pair_cleans_iterations'] = max_pair_cleans_iterations
+        kwargs['clean_by_cluster_flag'] = True
+        kwargs['color_by_cluster'] = color_by_cluster
+        quiver_cleaned_burgers(**kwargs)
+        # kwargs['pair_cluster_iterations'] = 2
+        # quiver_cleaned_burgers(**kwargs)
+
+
+def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_flag=True, distance_threshold=10, *args,
+                            **kwargs):
+    burg_file_surfix = 'ref-rhoH=' + str(ref_rhoH) + '_real=' + str(ref_real)
+    burg_name = 'vec_' + burg_file_surfix + '.txt'
+    sim_folder = 'null_models'
+    burg_dir_path = join(sims_dir, sim_folder, 'OP', 'burger_vectors')
+    load = WriteOrLoad(join(sims_dir, sim_name(ref_rhoH, *args, **kwargs)))
+    l_x, l_y, l_z, _, _, _, _, _ = load.load_Input()
+    load.boundaries = [l_x, l_y, l_z]
+    if not os.path.exists(join(burg_dir_path, burg_name)):
+        op_dir = op_path(ref_rhoH, 'burger_vectors')
+        file = 'vec_' + str(ref_real) + '.txt'
+        ref_burg = np.loadtxt(join(op_dir, file))
+        a = min([np.linalg.norm(b) for b in ref_burg[:, 2:]])
+        N_dislocations = ref_burg.shape[0]
+        burg = []
+        directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]
+        for i in range(N_dislocations):
+            direction = directions[np.random.randint(len(directions))]
+            pos = np.random.uniform(high=(l_x, l_y))
+            burg.append([x for x in pos] + [d * a for d in direction])
+        if not os.path.exists(burg_dir_path):
+            os.makedirs(burg_dir_path)
+        np.savetxt(join(burg_dir_path, burg_name), np.array(burg))
+    load.output_dir = join(sims_dir, sim_folder)
+    load.save_Input(rad=0, rho_H=0, edge=0, n_row=0, n_col=0)
+    coarse_grain_burgers(xlim=[0, l_x / 2], ylim=[0, l_y / 2], distance_threshold=distance_threshold,
+                         overwrite_cluster_clean=False, max_pair_cleans_iterations=pair_cleans,
+                         clean_by_cluster_flag=clean_by_cluster_flag, sim_folder=sim_folder,
+                         realization=burg_file_surfix)
 
 
 if __name__ == "__main__":
-    rhoH, realization = 0.81, 92347176  # 94363239  # 0.8, 64155333  # 92549977  #
+    rhoH_tetratic = 0.8
+    realization = 92549977  # 0.8: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
+
     # xlim, ylim = [120, 147], [30, 46]
-    xlim, ylim = [], []
-    quiver_burger(rhoH, xlim, ylim, realization=realization, bonds=False, quiv=True, plot_centers=False,
-                  quiv_surfix='_cluster-cleaned')
-    # for rad in [None, 10, 5, 2, 0]:
-    #     quiver_burger(rhoH, xlim, ylim, bonds=False, quiv=True, realization=realization, orientational_rad=rad)
-    # coarse_grain_burgers(rhoH, realization=realization, distance_threshold=5, overwrite_cluster_clean=False,
-    #                      xlim=[0, 260], ylim=[0, 260])
+    # xlim, ylim = [75, 81], [11.5, 16.3]
+    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=True, plot_centers=True, frustrated_bonds=True,
+    #               realization=realization)  #, quiv_surfix='_paired-4_clustered-D=10')
 
-    # plot_pos_and_orientation([0.85, 0.83, rhoH], [rhoH, 0.78, 0.77])
-    # plot_ising([0.85, rhoH, 0.75], rhoH_anneal=rhoH, plot_heat_capcity=True)
-    #
-    # plot_local_psi_hist([rhoH, 0.785, 0.78, 0.775, 0.77])
-    # plot_magnetic_corr([0.85, 0.83, rhoH, 0.77])
-    # plot_bragg_peak(rhoH)
-    # plot_annealing(rhoH, real=realization)
-    # plot_psi_convergence([0.83, rhoH, 0.78])
-    print('Finished succesfully')
-#     TODO: recreate all graphs for rhoH=0.81, which looks much finer
+    xlim, ylim = [160, 220], [50, 70]
+    quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=False, plot_centers=True, frustrated_bonds=False,
+                  realization=realization)
+    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=False, plot_centers=True, frustrated_bonds=True,
+    #               realization=realization)
 
-plt.show()
+    # coarse_grain_burgers(rhoH_tetratic, realization=realization, clean_by_cluster_flag=False,
+    #                      max_pair_cleans_iterations=0)
+    # coarse_grain_burgers(rhoH_tetratic, realization=realization, xlim=[0, 260], ylim=[0, 260], distance_threshold=10,
+    #                      overwrite_cluster_clean=False)
+    # coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=5)
+
+    # plot_pos_and_orientation([0.85, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
+    # plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=True)
+    # TODO: bring from ATLAS the graph files needed for this calculation
+    plot_local_psi_hist([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77])
+    # plot_magnetic_corr([0.85, 0.83, rhoH_tetratic, 0.77])
+    # plot_bragg_peak(rhoH_tetratic)
+    # plot_annealing(rhoH_tetratic, real=realization)
+    # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
+    print('Finished succesfully!')
+    #     TODO: recreate all graphs for rhoH=0.81, which looks much finer
+    plt.show()
