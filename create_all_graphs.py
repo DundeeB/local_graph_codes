@@ -192,8 +192,8 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
                     plt.plot(ex, ey, color='lightgray')
     if plot_centers:
         # plt.plot(x[up], y[up], '.', color='orange', label='up', markersize=10)
-        plt.plot(x[up], y[up], '.r', label='up', markersize=50)
-        plt.plot(x[down], y[down], '.b', label='down', markersize=50)
+        plt.plot(x[up], y[up], '.r', label='up', markersize=10)
+        plt.plot(x[down], y[down], '.b', label='down', markersize=10)
     if quiv:
         burg = np.loadtxt(join(op_dir, file))
         if len(xlim) > 0 and len(ylim) > 0:
@@ -271,7 +271,7 @@ def plt_cv(rhoH, *args, **kwargs):
         plt.plot(-J[:k], Cv[:k], colors_rho[rhoH], label="Solid " + prepare_lbl('rhoH=' + str(rhoH)),
                  **default_plt_kwargs)
         plt.plot(-J[k:], Cv[k:], colors_rho[rhoH], **default_plt_kwargs)
-    elif rhoH == 0.8:
+    elif 0.78 <= rhoH <= 0.83:
         plt.plot(-J[:i], Cv[:i], colors_rho[rhoH], label="Tetratic " + prepare_lbl('rhoH=' + str(rhoH)),
                  **default_plt_kwargs)
         plt.plot(-J[i:], Cv[i:], colors_rho[rhoH], **default_plt_kwargs)
@@ -283,13 +283,14 @@ def plt_anneal(rhoH, *args, **kwargs):
     default_plt_kwargs['linewidth'] = 2
     op_dir = op_path(rhoH, specif_op='Ising_k=4_undirected', *args, **kwargs)
     annealfiles, reals = sort_prefix(op_dir, 'anneal')
-    anneal_mat, real = np.loadtxt(join(op_dir, annealfiles[1])), reals[1]
+    anneal_mat, real = np.loadtxt(join(op_dir, annealfiles[0])), reals[0]
     # saving command in post process: np.savetxt(self.anneal_path, np.transpose([J] + self.frustration + self.Ms))
     J = anneal_mat[:, 0]
-    anneal_reals = int((len(anneal_mat[0]) - 1) / 2)
-    plt.plot(-J, anneal_mat[:, 1:anneal_reals], label='Anneal realization', **default_plt_kwargs)
-    minf = np.min(anneal_mat[:, 1:anneal_reals])
-    maxf = np.max(anneal_mat[-1, 1:anneal_reals])
+    # anneal_reals = int((len(anneal_mat[0]) - 1) / 2)
+    anneal_reals = int((anneal_mat.shape[1] - 1) / 2)  # first col is J, then Es and then Ms
+    plt.plot(-J, anneal_mat[:, 1:anneal_reals + 1], label='Anneal realization', **default_plt_kwargs)
+    minf = np.min(anneal_mat[:, 1:anneal_reals + 1])
+    maxf = np.max(anneal_mat[-1, 1:anneal_reals + 1])
     # plt.ylim([minf, minf * 1.05])
     return minf, maxf
 
@@ -551,16 +552,13 @@ def plot_psi_convergence(rhos):
     plt.savefig('graphs/psi_convergence')
 
 
-def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
-    # save graph into real num with 000 to differentiate from usual graph saves.
-    write_or_load = WriteOrLoad(sim_path)
-    l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
+def undirected_pairs_graph(X, l_x, l_y):
     cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x, l_y])
-    graph = kneighbors_graph(burg[:, :2], n_neighbors=1, metric=cyc)
+    graph = kneighbors_graph(X, n_neighbors=1, metric=cyc)
     I, J, _ = scipy.sparse.find(graph)[:]
     Ed = [(i, j) for (i, j) in zip(I, J)]
     Eud = []
-    N = len(burg)
+    N = len(X)
     udgraph = scipy.sparse.csr_matrix((N, N))
     for i, j in Ed:
         if ((j, i) in Ed) and ((i, j) not in Eud) and ((j, i) not in Eud):
@@ -569,8 +567,16 @@ def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
             udgraph[j, i] = 1
     graph = udgraph
     nearest_neighbor = [[j for j in graph.getrow(i).indices] for i in range(N)]
+    return nearest_neighbor
+
+
+def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
+    # save graph into real num with 000 to differentiate from usual graph saves.
+    write_or_load = WriteOrLoad(sim_path)
+    l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
+    nearest_neighbor = undirected_pairs_graph(burg[:, :2], l_x, l_y)
     cleaned_burg = []
-    for i in range(N):
+    for i in range(len(burg)):
         r1 = np.array([burg[i, 0], burg[i, 1]])
         b1 = np.array([burg[i, 2], burg[i, 3]])
         if len(nearest_neighbor[i]) == 0:
@@ -581,7 +587,7 @@ def clean_bound_pairs(burg, sim_path, cutoff=np.inf):
             continue
         r2 = [burg[j, 0], burg[j, 1]]
         b2 = [burg[j, 2], burg[j, 3]]
-        if cyc(r1, r2) > cutoff or np.linalg.norm(b1 + b2) > 1e-5:
+        if cyc_dist(r1, r2, [l_x, l_y]) > cutoff or np.linalg.norm(b1 + b2) > 1e-5:
             cleaned_burg.append([r1[0], r1[1], b1[0], b1[1]])
             cleaned_burg.append([r2[0], r2[1], b2[0], b2[1]])
     return np.array(cleaned_burg)
@@ -667,7 +673,7 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
     plt.title(('Microscopic Burgers' if pair_cleans_iterations == 0
                else ('Pair Cleaned ' + str(pair_cleans_iterations) + ' times')) + \
               ('' if (not clean_by_cluster_flag) else ', cluster cleaned D=' + str(int(
-                  cluster_args['distance_threshold'] / 2))) + (
+                  cluster_args['distance_threshold'] / 2)) + '$\sigma$') + (
                   '' if pair_cluster_iterations == 1 else 'pairs+cluster iterated ' + str(pair_cluster_iterations)))
     if len(xlim) > 0:
         plt.xlim(xlim)
@@ -703,7 +709,7 @@ def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair
     if clean_by_cluster_flag:
         quiver_cleaned_burgers(**kwargs)
         plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
-        plt.title('Clustering D=' + str(np.roumd(distance_threshold / 2, 1)))
+        plt.title('Clustering D=' + str(np.round(distance_threshold / 2, 1)) + '$sigma$')
         kwargs['pair_cleans_iterations'] = max_pair_cleans_iterations
         kwargs['clean_by_cluster_flag'] = True
         kwargs['color_by_cluster'] = color_by_cluster
@@ -712,9 +718,9 @@ def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair
         # quiver_cleaned_burgers(**kwargs)
 
 
-def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_flag=True, distance_threshold=10, *args,
-                            **kwargs):
-    burg_file_surfix = 'ref-rhoH=' + str(ref_rhoH) + '_real=' + str(ref_real)
+def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_flag=True, distance_threshold=10,
+                            bound_pairs=True, *args, **kwargs):
+    burg_file_surfix = 'ref-rhoH=' + str(ref_rhoH) + '_real=' + str(ref_real) + '_bound-pairs' if bound_pairs
     burg_name = 'vec_' + burg_file_surfix + '.txt'
     sim_folder = 'null_models'
     burg_dir_path = join(sims_dir, sim_folder, 'OP', 'burger_vectors')
@@ -726,13 +732,24 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
         file = 'vec_' + str(ref_real) + '.txt'
         ref_burg = np.loadtxt(join(op_dir, file))
         a = min([np.linalg.norm(b) for b in ref_burg[:, 2:]])
-        N_dislocations = ref_burg.shape[0]
-        burg = []
-        directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]
-        for i in range(N_dislocations):
-            direction = directions[np.random.randint(len(directions))]
-            pos = np.random.uniform(high=(l_x, l_y))
-            burg.append([x for x in pos] + [d * a for d in direction])
+        if not bound_pairs:
+            N_dislocations = ref_burg.shape[0]
+            burg = gen_rand_dislocations(N_dislocations, l_x, l_y, a)
+        else:
+            neighbors = undirected_pairs_graph(ref_burg[:, :2], l_x, l_y)
+            dists = []
+            N_pairs = 0
+            for i, neighbor_list in enumerate(neighbors):
+                if len(neighbor_list) == 0:
+                    continue
+                neighbor = neighbor_list[0]
+                dists.append(cyc_dist(ref_burg[i, :2], ref_burg[neighbor, :2], [l_x, l_y]))
+                N_pairs += 1
+            pairs_mean_separation = np.mean(dists)
+            pairs_std_separation = np.std(dists)
+            # TODO: N_singles
+            burg = gen_dislocations_w_pairs(N_pairs, N_singles, pairs_mean_separation, pairs_std_separation, l_x, l_y,
+                                            a)
         if not os.path.exists(burg_dir_path):
             os.makedirs(burg_dir_path)
         np.savetxt(join(burg_dir_path, burg_name), np.array(burg))
@@ -744,18 +761,46 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
                          realization=burg_file_surfix)
 
 
+def gen_rand_dislocations(N_dislocations, l_x, l_y, a):
+    burg = []
+    directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]
+    for i in range(N_dislocations):
+        direction = directions[np.random.randint(len(directions))]
+        pos = np.random.uniform(high=(l_x, l_y))
+        burg.append([x for x in pos] + [d * a for d in direction])
+    return burg
+
+
+def gen_dislocations_w_pairs(N_pairs, N_singles, pairs_mean_separation, pairs_std_separation, l_x, l_y, a):
+    burg = []
+    directions = [[1, 0], [0, 1], [-1, 0], [0, -1]]
+    for i in range(N_pairs):
+        direction = directions[np.random.randint(len(directions))]
+        pos = np.random.uniform(high=(l_x, l_y))
+        t = np.random.uniform(high=2 * np.pi)
+        pos2 = pos + (pairs_mean_separation + np.random.normal() * pairs_std_separation) * np.array(
+            [np.cos(t), np.sin(t)])
+        burg.append([x for x in pos] + [d * a for d in direction])
+        burg.append([x for x in pos2] + [-d * a for d in direction])
+    for i in range(N_singles):
+        direction = directions[np.random.randint(len(directions))]
+        pos = np.random.uniform(high=(l_x, l_y))
+        burg.append([x for x in pos] + [d * a for d in direction])
+    return burg
+
+
 if __name__ == "__main__":
-    rhoH_tetratic = 0.8
-    realization = 92549977  # 0.8: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
+    rhoH_tetratic = 0.81
+    realization = 94363239  # 0.8: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
 
     # xlim, ylim = [120, 147], [30, 46]
     # xlim, ylim = [75, 81], [11.5, 16.3]
     # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=True, plot_centers=True, frustrated_bonds=True,
     #               realization=realization)  #, quiv_surfix='_paired-4_clustered-D=10')
 
-    xlim, ylim = [160, 220], [50, 70]
-    quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=False, plot_centers=True, frustrated_bonds=False,
-                  realization=realization)
+    # xlim, ylim = [160, 195], [50, 70]
+    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=True, plot_centers=True, frustrated_bonds=False,
+    #               realization=realization)
     # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=False, plot_centers=True, frustrated_bonds=True,
     #               realization=realization)
 
@@ -763,16 +808,15 @@ if __name__ == "__main__":
     #                      max_pair_cleans_iterations=0)
     # coarse_grain_burgers(rhoH_tetratic, realization=realization, xlim=[0, 260], ylim=[0, 260], distance_threshold=10,
     #                      overwrite_cluster_clean=False)
-    # coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=5)
+    coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=5)
 
     # plot_pos_and_orientation([0.85, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
     # plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=True)
-    # TODO: bring from ATLAS the graph files needed for this calculation
-    plot_local_psi_hist([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77])
+    # plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77]))
     # plot_magnetic_corr([0.85, 0.83, rhoH_tetratic, 0.77])
     # plot_bragg_peak(rhoH_tetratic)
-    # plot_annealing(rhoH_tetratic, real=realization)
+    # plot_annealing(rhoH_tetratic)  # , real=realization)
     # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
     print('Finished succesfully!')
-    #     TODO: recreate all graphs for rhoH=0.81, which looks much finer
+    #     TODO: Missing graphs: Cv(T), convergence with new N=4e4 honeycomb ic
     plt.show()
