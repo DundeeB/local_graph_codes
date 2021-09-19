@@ -4,7 +4,7 @@ import os, re
 from sys import path as syspath
 
 syspath.append('C:\\Users\\Daniel Abutbul\\OneDrive - Technion\\OOP_hard_sphere_event_chain')
-from post_process import Ising, Graph
+from post_process import Ising, Graph, PsiMN
 from SnapShot import WriteOrLoad
 from mpl_toolkits import mplot3d
 import scipy
@@ -19,7 +19,8 @@ params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labe
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
 colors_rho = {0.85: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7', 0.79: 'C8'}
+              0.75: 'C7', 0.79: 'C8', 0.71: 'C9'}
+direction_colors = {(1, 1): 'b', (1, -1): 'm', (-1, 1): 'g', (-1, -1): 'r', (0, 0): 'gray'}
 
 
 def join(*args, **kwargs):
@@ -142,10 +143,12 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.savefig('graphs/orientation_and_position_corr')
 
 
-def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bonds=True, quiv=True,
-                  orientational_rad=None, plot_centers=True, quiv_surfix='', *args, **kwargs):
+def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=True, frustrated_bonds=True, quiv=True,
+                  orientational_rad=None, plot_centers=True, quiv_surfix='', new_fig=True, given_color=None, *args,
+                  **kwargs):
     plt.rcParams.update({'figure.figsize': (15, 8)})
-    plt.figure()
+    if new_fig:
+        plt.figure()
     op_name = 'burger_vectors'
     if orientational_rad is not None:
         op_name += '_orientation_rad=' + str(orientational_rad)
@@ -189,7 +192,7 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
                 if spins[i] * spins[j] > 0 and frustrated_bonds:
                     plt.plot(ex, ey, color='green', linewidth=3)
                 if spins[i] * spins[j] < 0 and bonds:
-                    plt.plot(ex, ey, color='lightgray')
+                    plt.plot(ex, ey, '--', color='lightgray')
     if plot_centers:
         # plt.plot(x[up], y[up], '.', color='orange', label='up', markersize=10)
         plt.plot(x[up], y[up], '.r', label='up', markersize=10)
@@ -200,11 +203,17 @@ def quiver_burger(rhoH, xlim, ylim, realization=None, bonds=False, frustrated_bo
             I_box = np.array(
                 [xlim[0] < x_ < xlim[1] and ylim[0] < y_ < ylim[1] for (x_, y_) in zip(burg[:, 0] / 2, burg[:, 1] / 2)])
             burg = burg[I_box, :]
+        color = associate_color(np.sum(burg[:, 2:], 0)) if given_color is None else given_color
         plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy',
-                   scale=1, label='Burger field', width=3e-3, zorder=7)
+                   scale=1, label='Burger field', width=3e-3, zorder=7, color=color)
 
     plt.axis('equal')
     # plt.legend()
+
+    # x1, x2 = xlim
+    # y1, y2 = ylim
+    # plt.plot([x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], '-k', **default_plt_kwargs)
+
     plt.savefig('graphs/burger_vectors')
     return
 
@@ -364,8 +373,8 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
     rhos, ground_state, sphere_frustration, max_cv_frustration = filter(np.logical_not(np.isnan(sphere_frustration)),
                                                                         rhos, ground_state, sphere_frustration,
                                                                         max_cv_frustration)
-    plt.plot(rhos, ground_state, 'r', label='ground state', **default_plt_kwargs)
-    plt.plot(rhos, sphere_frustration, 'm', label='sphere heights', **default_plt_kwargs)
+    plt.plot(rhos, ground_state, 'r', label='$f_\mathrm{frust}$', **default_plt_kwargs)
+    plt.plot(rhos, sphere_frustration, 'm', label='$f_\mathrm{unsat}$', **default_plt_kwargs)
     # plt.plot(rhos, max_cv_frustration, '.k', **default_plt_kwargs)
     # rhos_specific = [0.75, 0.8, 0.85]
     # max_cv_frustration_specific = [f for f, rho in zip(max_cv_frustration, rhos) if rho in rhos_specific]
@@ -385,7 +394,7 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
 
     plt.legend(loc=1)
     plt.grid()
-    plt.ylabel('frustration')
+    # plt.ylabel('$f_\mathrm{unsat}$')
     plt.xlabel(prepare_lbl('rhoH'))
     if plot_heat_capcity:
         plt.xlim([0.5, 0.9])
@@ -399,7 +408,7 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
     plt.figure()
     plt.grid()
     plt.xlabel('$\\beta$J')
-    plt.ylabel('frustration')
+    plt.ylabel('$f_\mathrm{unsat}$')
     i = np.where(rhos == rhoH_anneal)[0][0]
     J_lim = [1, 3.0]
     plt.plot(J_lim, 2 * [sphere_frustration[i]], '--k', label='Sphere height', **default_plt_kwargs)
@@ -483,6 +492,110 @@ def plot_bragg_peak(rhoH, *args, **kwargs):
         except Exception as err:
             print(err)
     plt.savefig('graphs/Bragg_peak')
+
+
+def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', *args, **kwargs):
+    save = False
+    load = True
+    kres = 50
+    anglesres = 500
+    zero_k_area = 15000
+
+    plt.rcParams.update({'figure.figsize': (10, 10), 'axes.labelsize': 0.45 * size, 'xtick.labelsize': size * 0.38,
+                         'ytick.labelsize': size * 0.4, 'legend.fontsize': size * 0.4, 'axes.titlesize': size * 0.6})
+    fig = plt.figure()
+    for i, rhoH in enumerate(rhoH_vec):
+        plt.subplot(np.ceil(len(rhoH_vec) / 2), 2, i + 1)
+        if (i + 1) % 2 == 1:
+            plt.ylabel('$\\frac{a_0}{2\pi}k_y$')
+        if i + 1 > 2:
+            plt.xlabel('$\\frac{a_0}{2\pi}k_x$')
+        plt.title('$\\rho_H$=' + str(rhoH))
+
+        sim_path = join(sims_dir, sim_name(rhoH, *args, **kwargs))
+        write_or_load = WriteOrLoad(sim_path)
+        l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
+        N = 90000
+        a_0 = np.sqrt(l_x * l_y / N)
+        if bragg_type == 'Bragg_S':
+            k_ideal = 2 * np.pi / a_0
+        elif bragg_type == 'Bragg_Sm':
+            k_ideal = np.sqrt(2) * np.pi / a_0
+
+        load_save_path = join(op_path(rhoH, bragg_type, *args, **kwargs), 'local_data')
+        if load:
+            kx, ky, S = np.loadtxt(load_save_path, unpack=True, usecols=(0, 1, 2))
+        else:
+            psi = PsiMN(sim_path, 1, 4)
+            psi.read_or_calc_write()
+            print(psi.spheres_ind)
+            _, sp = psi.rotate_spheres()
+            sp = np.array(sp)
+            x = sp[:, 0]
+            y = sp[:, 1]
+            z = sp[:, 2]
+            z = (z - np.mean(z)) * 2 / (np.max(z) - np.min(z))
+            kmin, kmax = 0.5 * k_ideal, 1.5 * k_ideal
+            k_rads = np.linspace(kmin, kmax, kres)
+            angles = np.linspace(0, 2 * np.pi, anglesres)
+            k = [np.array([k_ * np.cos(t), k_ * np.sin(t)]) for k_ in k_rads for t in angles]
+            k_inner = np.linspace(0, kmin, zero_k_area)
+            ts = [np.random.random() * np.pi * 2 for _ in k_inner]
+            i_inner = len(k)
+            k = k + [np.array([k_ * np.cos(t), k_ * np.sin(t)]) for (k_, t) in zip(k_inner, ts)]
+            S = np.zeros(len(k))
+            kx = np.array([k[0] for k in k])
+            ky = np.array([k[1] for k in k])
+            for i, k_ in enumerate(k):
+                phase = k_[0] * x + k_[1] * y
+                if bragg_type == 'Bragg_S':
+                    S[i] = 1 / N * (np.sum(np.cos(phase)) ** 2 + np.sum(np.sin(phase)) ** 2)
+                elif bragg_type == 'Bragg_Sm':
+                    S[i] = 1 / N * (np.sum(z * np.cos(phase)) ** 2 + np.sum(z * np.sin(phase)) ** 2)
+            try:
+                op_dir = op_path(rhoH, bragg_type, *args, **kwargs)
+                data_file = 'vec_' + str(psi.spheres_ind) + '.txt'
+                kxs_precaculated, kys_precaculated, S_precaculated = np.loadtxt(join(op_dir, data_file), unpack=True,
+                                                                                usecols=(0, 1, 2))
+                I = np.where([k_ < 1.5 * k_ideal for k_ in np.sqrt(kxs_precaculated ** 2 + kys_precaculated ** 2)])
+                if max(S[:i_inner]) > max(S_precaculated):
+                    print("Found Higher S in current analysis by a factor of " + str(max(S) / max(S_precaculated)))
+                else:
+                    print("Higher S in ATLAS analysis")
+                S = np.concatenate((S, S_precaculated[I]))
+                kx = np.concatenate((kx, kxs_precaculated[I]))
+                ky = np.concatenate((ky, kys_precaculated[I]))
+            except:
+                pass
+            idx = S.argsort()
+            kx, ky, S = kx[idx], ky[idx], S[idx]
+        vmax = np.max([S_ for (k_, S_) in zip(np.sqrt(kx ** 2 + ky ** 2), S) if k_ > 0.5 * k_ideal])
+        plt.scatter(a_0 * kx / (2 * np.pi), a_0 * ky / (2 * np.pi), c=S, s=3, vmin=0, vmax=vmax)
+        if save:
+            # append([k[0], k[1], S_])
+            np.savetxt(load_save_path,
+                       np.array([[kx[i], ky[i], S[i]] for i in range(len(S))]))
+    plt.savefig('graphs/color_' + bragg_type)
+
+
+def plot_z_histogram(rhoH_vec, *args, **kwargs):
+    plt.rcParams.update(params)
+    plt.rcParams.update({'figure.figsize': (10, 10)})
+    plt.figure()
+    for rhoH in rhoH_vec:
+        sim_path = join(sims_dir, sim_name(rhoH, *args, **kwargs))
+        write_or_load = WriteOrLoad(sim_path)
+        sp = write_or_load.last_spheres()[0]
+        z = sp[:, 2]
+        z = (z - np.mean(z)) * 2 / (np.max(z) - np.min(z))
+        hist, bin_edges = np.histogram(z, 50, density=True)
+        plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, colors_rho[rhoH], label='$\\rho_H$=' + str(rhoH),
+                 linewidth=3)
+    plt.xlabel('height of spheres normalized to [-1,1]')
+    plt.ylabel('pdf')
+    plt.grid()
+    plt.legend()
+    plt.savefig('graphs/z_histogram')
 
 
 def plot_annealing(rhoH, real=None, *args, **kwargs):
@@ -624,18 +737,20 @@ def plot_clustering(burg, algorithm, *args, **kwargs):
     for cluster in clusters:
         row_ix = np.where(yhat == cluster)[0]
         sum_b = np.sum(burg[row_ix, 2:4], 0)
+        color = associate_color(np.sum(burg[row_ix, 2:4], 0))
         cluster_parity.append(int(np.round(np.linalg.norm(sum_b / a) ** 2)))
         if cluster_parity[-1] % 2 == 0:
-            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '.', markersize=15)
+            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '.', markersize=15, color=color)
         else:
-            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '*', markersize=15)
+            plt.plot(X[row_ix, 0] / 2, X[row_ix, 1] / 2, '*', markersize=10)
     return np.array(cluster_parity)
 
 
 def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1, cutoff=np.inf, xlim=[], ylim=[],
                            overwrite_pair_cleaning=False, clean_by_cluster_flag=False, cluster_algorithm=None,
                            cluster_args={}, overwrite_cluster_clean=True, color_by_cluster=False,
-                           pair_cluster_iterations=1, sim_folder=None, *args, **kwargs):
+                           pair_cluster_iterations=1, sim_folder=None, plot_for_paper=False, box=[], arrow_width=3e-3,
+                           *args, **kwargs):
     plt.rcParams.update({'figure.figsize': (15, 8)})
     plt.figure()
     sim = join(sims_dir, sim_name(rhoH, *args, **kwargs) if sim_folder is None else sim_folder)
@@ -649,6 +764,11 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
     plt.axis('equal')
     # plt.legend()
     burg = np.loadtxt(join(op_dir, file))
+    if plot_for_paper:
+        # plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy',
+        #            scale=1, label='Burger field', width=3e-3, color='gray')
+        plt.plot(burg[:, 0] / 2, burg[:, 1] / 2, '.', markersize=2, color='gray')
+        # Fig 3 gray small dots of microscopic Burgers field
     name = 'vec_' + str(realization)
     for k in range(pair_cluster_iterations):
         nom_name = name
@@ -668,8 +788,16 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
             else:
                 burg = clean_by_cluster(burg, cluster_algorithm, **cluster_args)
                 np.savetxt(clean_path, burg)
-    plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy', scale=1,
-               label='Burger field', width=3e-3, zorder=7)  # headwidth=3)  # , headlength=10, headaxislength=6
+    if len(box) > 0:
+        xlim_box, ylim_box = box
+        x1, x2 = xlim_box
+        y1, y2 = ylim_box
+        plt.plot([x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], '-k', **default_plt_kwargs)
+
+    # plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy', scale=1,
+    #            label='Burger field', width=arrow_width, zorder=7)
+    # plt.plot(burg[:, 0] / 2, burg[:, 1] / 2, '.', markersize=5, color='red', zorder=7)
+    # Fig 3
     plt.title(('Microscopic Burgers' if pair_cleans_iterations == 0
                else ('Pair Cleaned ' + str(pair_cleans_iterations) + ' times')) + \
               ('' if (not clean_by_cluster_flag) else ', cluster cleaned D=' + str(int(
@@ -680,7 +808,10 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
     if len(ylim) > 0:
         plt.ylim(ylim)
     if color_by_cluster:
+        # Fig 3 colored dots
         cluster_parity = plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
+        if plot_for_paper:
+            plt.savefig('graphs/global_Burgers_field_w_cleaning_and_zoom_in')
         plt.figure()
         plt.hist(cluster_parity, np.array(range(max(cluster_parity) + 1)) + 0.5)
         plt.xlim([0, 9])
@@ -693,7 +824,8 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
 def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair_cleans_iterations=4,
                          clean_by_cluster_flag=True, cluster_algorithm=AgglomerativeClustering, distance_threshold=10,
                          cluster_args={'compute_full_tree': True, 'n_clusters': None, 'linkage': 'single'},
-                         color_by_cluster=True, overwrite_cluster_clean=False, sim_folder=None):
+                         color_by_cluster=True, overwrite_cluster_clean=False, sim_folder=None, plot_for_paper=False,
+                         box=[]):
     write_or_load = WriteOrLoad(join(sims_dir, sim_name(rhoH) if sim_folder is None else sim_folder))
     l_x, l_y, _, _, _, _, _, _ = write_or_load.load_Input()
     cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x, l_y])
@@ -703,16 +835,22 @@ def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair
     kwargs = {'rhoH': rhoH, 'xlim': xlim, 'ylim': ylim, 'realization': realization,
               'clean_by_cluster_flag': False, 'cluster_algorithm': cluster_algorithm, 'cluster_args': cluster_args,
               'overwrite_cluster_clean': overwrite_cluster_clean, 'sim_folder': sim_folder}
-    for pair_cleans_iterations in range(max_pair_cleans_iterations + 1):
-        kwargs['pair_cleans_iterations'] = pair_cleans_iterations
-        burg = quiver_cleaned_burgers(**kwargs)
+    if plot_for_paper:
+        kwargs['pair_cleans_iterations'] = max_pair_cleans_iterations
+    else:
+        for pair_cleans_iterations in range(max_pair_cleans_iterations + 1):
+            kwargs['pair_cleans_iterations'] = pair_cleans_iterations
+            burg = quiver_cleaned_burgers(**kwargs)
     if clean_by_cluster_flag:
-        quiver_cleaned_burgers(**kwargs)
-        plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
-        plt.title('Clustering D=' + str(np.round(distance_threshold / 2, 1)) + '$sigma$')
+        if not plot_for_paper:
+            quiver_cleaned_burgers(**kwargs)
+            plot_clustering(burg, algorithm=cluster_algorithm, **cluster_args)
+            plt.title('Clustering D=' + str(np.round(distance_threshold / 2, 1)) + '$\sigma$')
         kwargs['pair_cleans_iterations'] = max_pair_cleans_iterations
         kwargs['clean_by_cluster_flag'] = True
         kwargs['color_by_cluster'] = color_by_cluster
+        kwargs['plot_for_paper'] = plot_for_paper
+        kwargs['box'] = box
         quiver_cleaned_burgers(**kwargs)
         # kwargs['pair_cluster_iterations'] = 2
         # quiver_cleaned_burgers(**kwargs)
@@ -720,7 +858,7 @@ def coarse_grain_burgers(rhoH=None, xlim=[], ylim=[], realization=None, max_pair
 
 def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_flag=True, distance_threshold=10,
                             bound_pairs=True, *args, **kwargs):
-    burg_file_surfix = 'ref-rhoH=' + str(ref_rhoH) + '_real=' + str(ref_real) + '_bound-pairs' if bound_pairs
+    burg_file_surfix = 'ref-rhoH=' + str(ref_rhoH) + '_real=' + str(ref_real) + '_bound-pairs' if bound_pairs else ''
     burg_name = 'vec_' + burg_file_surfix + '.txt'
     sim_folder = 'null_models'
     burg_dir_path = join(sims_dir, sim_folder, 'OP', 'burger_vectors')
@@ -737,17 +875,49 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
             burg = gen_rand_dislocations(N_dislocations, l_x, l_y, a)
         else:
             neighbors = undirected_pairs_graph(ref_burg[:, :2], l_x, l_y)
+            # TODO: make neighbors only if b_i+b_j=0
             dists = []
-            N_pairs = 0
             for i, neighbor_list in enumerate(neighbors):
                 if len(neighbor_list) == 0:
                     continue
-                neighbor = neighbor_list[0]
-                dists.append(cyc_dist(ref_burg[i, :2], ref_burg[neighbor, :2], [l_x, l_y]))
-                N_pairs += 1
+                j = neighbor_list[0]
+                if j < i or (np.linalg.norm(ref_burg[i, 2:] + ref_burg[j, 2:]) > 1e-5):
+                    continue
+                dists.append(cyc_dist(ref_burg[i, :2], ref_burg[j, :2], [l_x, l_y]))
+            N_pairs = len(dists)
             pairs_mean_separation = np.mean(dists)
             pairs_std_separation = np.std(dists)
-            # TODO: N_singles
+            hist, bin_edges = np.histogram(dists, density=True, bins=np.linspace(0.3, 5, 48))
+            # TODO: try Poisson instead of normal pdf fit and driving statistics.
+            bin_centers = bin_edges[:-1] + np.diff(bin_edges) / 2
+            plt.rcParams.update(params)
+            plt.figure()
+            plt.plot(bin_centers / 2, hist, label='From $\\rho_H$=0.81 simulation', **default_plt_kwargs)
+            x = np.linspace(pairs_mean_separation - 3 * pairs_std_separation,
+                            pairs_mean_separation + 3 * pairs_std_separation, 100)
+            plt.plot(x / 2, scipy.stats.norm.pdf(x, pairs_mean_separation, pairs_std_separation),
+                     label='Calibrated normal pdf', **default_plt_kwargs)
+            # plt.plot(x, scipy.stats.expon.pdf(x, scale=pairs_mean_separation), label='exponential pdf')
+            plt.grid()
+            plt.xlabel('Separation/$\sigma$')
+            plt.ylabel('pdf')
+            plt.legend()
+
+            ref_burg_clustered_name = 'vec_' + str(realization) + '_paired-4_clustered-D=10.txt'
+            ref_burg_clustered = np.loadtxt(join(op_dir, ref_burg_clustered_name))
+            X = ref_burg_clustered[:, :2]
+            cyc = lambda p1, p2: cyc_dist(p1, p2, [l_x, l_y])
+            model = AgglomerativeClustering(compute_full_tree=True, n_clusters=None, linkage='single',
+                                            distance_threshold=distance_threshold,
+                                            affinity=lambda X: pairwise_distances(X, metric=cyc))
+            try:
+                model.fit(X)
+                yhat = model.predict(X)
+            except AttributeError:
+                yhat = model.fit_predict(X)
+            N_singles = len(np.unique(yhat))
+
+            print((N_pairs, N_singles, pairs_mean_separation, pairs_std_separation, l_x, l_y, a))
             burg = gen_dislocations_w_pairs(N_pairs, N_singles, pairs_mean_separation, pairs_std_separation, l_x, l_y,
                                             a)
         if not os.path.exists(burg_dir_path):
@@ -789,34 +959,40 @@ def gen_dislocations_w_pairs(N_pairs, N_singles, pairs_mean_separation, pairs_st
     return burg
 
 
+def associate_color(b):
+    burgers = list(direction_colors.keys())
+    norm = np.sqrt(2) / np.linalg.norm(b) if np.linalg.norm(b) > 1e-3 else 0
+    dist = []
+    for burg in burgers:
+        dist.append(np.linalg.norm(np.array(burg) - norm * b))
+    return direction_colors[burgers[np.argmin(dist)]]
+
+
 if __name__ == "__main__":
     rhoH_tetratic = 0.81
-    realization = 94363239  # 0.8: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
+    realization = 94363239  # 0.81: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
 
+    # Plot global burger field before and after cleaning - Fig. 3
     # xlim, ylim = [120, 147], [30, 46]
-    # xlim, ylim = [75, 81], [11.5, 16.3]
-    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=True, plot_centers=True, frustrated_bonds=True,
-    #               realization=realization)  #, quiv_surfix='_paired-4_clustered-D=10')
-
-    # xlim, ylim = [160, 195], [50, 70]
-    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=True, plot_centers=True, frustrated_bonds=False,
-    #               realization=realization)
-    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=True, quiv=False, plot_centers=True, frustrated_bonds=True,
-    #               realization=realization)
-
-    # coarse_grain_burgers(rhoH_tetratic, realization=realization, clean_by_cluster_flag=False,
-    #                      max_pair_cleans_iterations=0)
     # coarse_grain_burgers(rhoH_tetratic, realization=realization, xlim=[0, 260], ylim=[0, 260], distance_threshold=10,
-    #                      overwrite_cluster_clean=False)
-    coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=5)
+    #                      overwrite_cluster_clean=False, plot_for_paper=True, box=[xlim, ylim])
+
+    # Plot zoom-in in Fig. 3
+    # quiver_burger(rhoH_tetratic, xlim, ylim, realization=realization, given_color='gray')
+    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=False, plot_centers=False, frustrated_bonds=False,
+    #               realization=realization, quiv_surfix='_paired-4_clustered-D=10', new_fig=False)
+
+    # coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
 
     # plot_pos_and_orientation([0.85, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
-    # plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=True)
+    plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=False)
     # plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77]))
     # plot_magnetic_corr([0.85, 0.83, rhoH_tetratic, 0.77])
-    # plot_bragg_peak(rhoH_tetratic)
+    # plot_bragg_peak(0.75)
+    # for bragg_type in ['Bragg_Sm', 'Bragg_S']:
+    #     plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
+    # plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
     # plot_annealing(rhoH_tetratic)  # , real=realization)
     # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
     print('Finished succesfully!')
-    #     TODO: Missing graphs: Cv(T), convergence with new N=4e4 honeycomb ic
     plt.show()
