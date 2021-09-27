@@ -450,7 +450,7 @@ def plot_local_psi_hist(rhos, rad=30, *args, **kwargs):
     plt.legend()
     plt.grid()
     plt.xlabel('|$\\psi_{4}^{r=' + str(int(rad / 2)) + '\sigma}$|')
-    plt.ylabel('pdf')
+    plt.ylabel('PDF')
     plt.savefig('graphs/local_psi_histogram')
 
 
@@ -591,8 +591,8 @@ def plot_z_histogram(rhoH_vec, *args, **kwargs):
         hist, bin_edges = np.histogram(z, 50, density=True)
         plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, colors_rho[rhoH], label='$\\rho_H$=' + str(rhoH),
                  linewidth=3)
-    plt.xlabel('height of spheres normalized to [-1,1]')
-    plt.ylabel('pdf')
+    plt.xlabel('normalized sphere height')
+    plt.ylabel('PDF')
     plt.grid()
     plt.legend()
     plt.savefig('graphs/z_histogram')
@@ -653,8 +653,10 @@ def plot_psi_convergence(rhos):
         plt.semilogx(reals, psi_avg, s + colors_rho[rho], label=label, **default_plt_kwargs)
 
     for rho in rhos:
-        plt_rho(rho, prepare_lbl('rhoH=' + str(rho)) + ', N=9e4, square ic')
-        plt_rho(rho, 'N=4e4, honeycomb ic', s='--', initial_conditions='AF_triangle', N=4e4)
+        rho_str = str(rho) if rho != 0.8 else '0.80'
+        plt_rho(rho, prepare_lbl('rhoH=' + rho_str) + ', square ic, N=90,000')
+        # plt_rho(rho, '        honeycomb ic, N=40,000', s='--', initial_conditions='AF_triangle', N=4e4)
+        plt_rho(rho, 'honeycomb ic, N=40,000', s='--', initial_conditions='AF_triangle', N=4e4)
         # plt_rho(rho, prepare_lbl('rhoH=' + str(rho)) + ', square ic')
         # plt_rho(rho, 'honeycomb ic', s='--', initial_conditions='AF_triangle')
     plt.legend(loc=1)
@@ -900,7 +902,7 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
             # plt.plot(x, scipy.stats.expon.pdf(x, scale=pairs_mean_separation), label='exponential pdf')
             plt.grid()
             plt.xlabel('Separation/$\sigma$')
-            plt.ylabel('pdf')
+            plt.ylabel('PDF')
             plt.legend()
 
             ref_burg_clustered_name = 'vec_' + str(realization) + '_paired-4_clustered-D=10.txt'
@@ -985,7 +987,7 @@ if __name__ == "__main__":
     # coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
 
     # plot_pos_and_orientation([0.85, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
-    plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=False)
+    # plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=False)
     # plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77]))
     # plot_magnetic_corr([0.85, 0.83, rhoH_tetratic, 0.77])
     # plot_bragg_peak(0.75)
@@ -993,6 +995,7 @@ if __name__ == "__main__":
     #     plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
     # plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
     # plot_annealing(rhoH_tetratic)  # , real=realization)
-    # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
+    plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
     print('Finished succesfully!')
     plt.show()
+# TODO: understand why 0.81<=rho_H<=0.83 runs of annealing Ising did not save any anneal file
