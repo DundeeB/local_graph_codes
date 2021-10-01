@@ -27,8 +27,8 @@ def join(*args, **kwargs):
     return os.path.join(*args, **kwargs)
 
 
-def sim_name(rhoH, N=9e4, h=0.8, initial_conditions='AF_square'):
-    return 'N=' + str(int(N)) + '_h=' + str(h) + '_rhoH=' + str(rhoH) + '_' + initial_conditions + '_ECMC'
+def sim_name(rhoH, N=9e4, h=0.8, initial_conditions='AF_square', algorithm='ECMC'):
+    return 'N=' + str(int(N)) + '_h=' + str(h) + '_rhoH=' + str(rhoH) + '_' + initial_conditions + '_' + algorithm
 
 
 def op_path(rhoH, specif_op=None, *args, **kwargs):
@@ -877,7 +877,6 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
             burg = gen_rand_dislocations(N_dislocations, l_x, l_y, a)
         else:
             neighbors = undirected_pairs_graph(ref_burg[:, :2], l_x, l_y)
-            # TODO: make neighbors only if b_i+b_j=0
             dists = []
             for i, neighbor_list in enumerate(neighbors):
                 if len(neighbor_list) == 0:
@@ -890,7 +889,6 @@ def coarse_grain_null_model(ref_rhoH, ref_real, pair_cleans=4, clean_by_cluster_
             pairs_mean_separation = np.mean(dists)
             pairs_std_separation = np.std(dists)
             hist, bin_edges = np.histogram(dists, density=True, bins=np.linspace(0.3, 5, 48))
-            # TODO: try Poisson instead of normal pdf fit and driving statistics.
             bin_centers = bin_edges[:-1] + np.diff(bin_edges) / 2
             plt.rcParams.update(params)
             plt.figure()
@@ -970,6 +968,71 @@ def associate_color(b):
     return direction_colors[burgers[np.argmin(dist)]]
 
 
+def bench_mark():
+    # 2 figures: 1) convergence of psi_mean. 2) subplot(211) - histogram of |psi_4|, subplot(212) - histogram of z
+    N, rhoH = 100, 0.7
+
+    # Figure 1: convergence of psi_mean
+    plt.rcParams.update(params)
+    plt.rcParams.update({'figure.figsize': (10, 10), 'legend.fontsize': size * 0.6})
+    plt.figure()
+    default_plt_kwargs['linewidth'] = 5
+    for initial_conditions in ['AF_square', 'AF_triangle']:
+        for algorithm in ['ECMC', 'MCMC']:
+            fname = join(
+                op_path(rhoH, specif_op='psi_14', N=N, algorithm=algorithm, initial_conditions=initial_conditions),
+                'mean_vs_real.txt')
+            reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
+            reals = np.real(reals)
+            psi_avg = np.abs(psi_avg)
+            elapsed_hours = 24.0 * 2  # two days
+            plt.plot(reals * elapsed_hours / reals[-1], psi_avg,
+                     label=algorithm + ', ic=' + ('square' if initial_conditions == 'AF_square' else 'honeycomb'),
+                     **default_plt_kwargs)
+    plt.legend(loc=1)
+    plt.xlabel('realization')
+    plt.ylabel('$|\\overline{\\psi_{4}}|$')
+    plt.ylim([0, 1.4])
+    plt.grid()
+    plt.savefig('graphs/bench_mark_psi_convergence')
+
+    # Figure 2: subplot(211) - histogram of |psi_4|, subplot(212) - histogram of z
+    plt.figure()
+    for initial_conditions in ['AF_square', 'AF_triangle']:
+        for algorithm in ['ECMC', 'MCMC']:
+            kwargs = {'N': N, 'algorithm': algorithm, 'initial_conditions': initial_conditions}
+
+            plt.subplot(211)
+            fname = join(op_path(rhoH, specif_op='psi_14', **kwargs), 'mean_vs_real.txt')
+            reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
+            psi_avg = np.abs(psi_avg)
+            hist, bin_edges = np.histogram(psi_avg, density=True)
+            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist,
+                     label=algorithm + ', ic=' + ('square' if initial_conditions == 'AF_square' else 'honeycomb'),
+                     **default_plt_kwargs)
+
+            plt.subplot(212)
+            sim_path = join(sims_dir, sim_name(rhoH, **kwargs))
+            write_or_load = WriteOrLoad(sim_path)
+            sp = write_or_load.last_spheres()[0]
+            z = sp[:, 2]
+            z = (z - np.mean(z)) * 2 / (np.max(z) - np.min(z))
+            hist, bin_edges = np.histogram(z, density=True)
+            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, **default_plt_kwargs)
+
+    plt.subplot(211)
+    plt.legend(loc=1)
+    plt.ylabel('PDF')
+    plt.xlabel('$|\\overline{\\psi_{4}}|$')
+    plt.grid()
+    plt.subplot(212)
+    plt.ylabel('PDF')
+    plt.xlabel('normalized sphere height')
+    plt.grid()
+
+    plt.savefig('graphs/bench_mark_psi_z_histograms')
+
+
 if __name__ == "__main__":
     rhoH_tetratic = 0.81
     realization = 94363239  # 0.81: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
@@ -995,7 +1058,8 @@ if __name__ == "__main__":
     #     plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
     # plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
     # plot_annealing(rhoH_tetratic)  # , real=realization)
-    plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
+    # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
+    bench_mark()
     print('Finished succesfully!')
     plt.show()
 # TODO: understand why 0.81<=rho_H<=0.83 runs of annealing Ising did not save any anneal file
