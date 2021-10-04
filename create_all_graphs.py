@@ -977,7 +977,7 @@ def bench_mark():
         return alg_lbl + ', ic=' + ic_lbl
 
     def plot_str(algorithm, ic):
-        s = '-' if algorithm == 'ECMC' else '--'
+        s = '--' if algorithm == 'ECMC' else '-'
         s += 'b' if ic == 'AF_square' else 'g'
         return s
 
@@ -986,7 +986,6 @@ def bench_mark():
     plt.rcParams.update({'figure.figsize': (10, 10), 'legend.fontsize': size * 0.6})
     plt.figure()
     default_plt_kwargs['linewidth'] = 5
-    zorder = 100
     for algorithm in ['LMC', 'ECMC']:
         for initial_conditions in ['AF_square', 'AF_triangle']:
             fname = join(
@@ -997,8 +996,7 @@ def bench_mark():
             psi_avg = np.abs(psi_avg)
             elapsed_hours = 24 * 2  # (len(psi_avg) - 1) / 2.0  # in hours
             plt.plot(reals * elapsed_hours / reals[-1], psi_avg, plot_str(algorithm, initial_conditions),
-                     label=label(algorithm, initial_conditions), **default_plt_kwargs, zorder=zorder)
-            zorder -= 1
+                     label=label(algorithm, initial_conditions), **default_plt_kwargs)
     plt.legend(loc=1)
     plt.xlabel('elapsed real time [h]')
     plt.ylabel('$|\\overline{\\psi_{4}}|$')
@@ -1014,14 +1012,13 @@ def bench_mark():
             hists = []
             op_dir = op_path(rhoH, specif_op='psi_14', **kwargs)
             files, reals = sort_prefix(op_dir, 'vec_')
-            for k in range(1):
+            for k in range(60):
                 psi = np.loadtxt(join(op_dir, files[k]), dtype=complex)
                 hist, bin_edges = np.histogram(np.abs(psi), 50, density=True)
                 hists.append(hist)
             hist = np.mean(hists, 0)
             plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, plot_str(algorithm, initial_conditions),
-                     label=label(algorithm, initial_conditions), **default_plt_kwargs, zorder=zorder)
-            zorder -= 1
+                     label=label(algorithm, initial_conditions), **default_plt_kwargs)
     plt.legend(loc=2)
     plt.ylabel('PDF')
     plt.xlabel('$|\\psi_{4}|$')
@@ -1044,8 +1041,7 @@ def bench_mark():
                 hists.append(hist)
             hist = np.mean(hists, 0)
             plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, plot_str(algorithm, initial_conditions),
-                     label=label(algorithm, initial_conditions), zorder=zorder, **default_plt_kwargs)
-            zorder -= 1
+                     label=label(algorithm, initial_conditions), **default_plt_kwargs)
     plt.legend(loc=9)
     plt.ylabel('PDF')
     plt.xlabel('normalized sphere height')
