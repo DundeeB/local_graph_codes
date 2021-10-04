@@ -972,9 +972,14 @@ def bench_mark():
     N, rhoH = 900, 0.8
 
     def label(aglorithm, ic):
-        alg_lbl = 'Metropolis (Local MC)' if algorithm == 'MCMC' else 'Event Chain MC'
+        alg_lbl = 'Metropolis (Local MC)' if algorithm == 'LMC' else 'Event Chain MC'
         ic_lbl = 'square' if initial_conditions == 'AF_square' else 'honeycomb'
         return alg_lbl + ', ic=' + ic_lbl
+
+    def plot_str(algorithm, ic):
+        s = '-' if algorithm == 'ECMC' else '--'
+        s += 'b' if ic == 'AF_square' else 'g'
+        return s
 
     # Figure 1: convergence of psi_mean
     plt.rcParams.update(params)
@@ -982,7 +987,7 @@ def bench_mark():
     plt.figure()
     default_plt_kwargs['linewidth'] = 5
     zorder = 100
-    for algorithm in ['MCMC', 'ECMC']:
+    for algorithm in ['LMC', 'ECMC']:
         for initial_conditions in ['AF_square', 'AF_triangle']:
             fname = join(
                 op_path(rhoH, specif_op='psi_14', N=N, algorithm=algorithm, initial_conditions=initial_conditions),
@@ -990,9 +995,9 @@ def bench_mark():
             reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
             reals = np.real(reals)
             psi_avg = np.abs(psi_avg)
-            elapsed_hours = 24*2  # (len(psi_avg) - 1) / 2.0  # in hours
-            plt.plot(reals * elapsed_hours / reals[-1], psi_avg, label=label(algorithm, initial_conditions),
-                     **default_plt_kwargs, zorder=zorder)
+            elapsed_hours = 24 * 2  # (len(psi_avg) - 1) / 2.0  # in hours
+            plt.plot(reals * elapsed_hours / reals[-1], psi_avg, plot_str(algorithm, initial_conditions),
+                     label=label(algorithm, initial_conditions), **default_plt_kwargs, zorder=zorder)
             zorder -= 1
     plt.legend(loc=1)
     plt.xlabel('elapsed real time [h]')
@@ -1003,43 +1008,43 @@ def bench_mark():
 
     # Figure 2: histogram of |psi_4|
     plt.figure()
-    for algorithm in ['MCMC', 'ECMC']:
+    for algorithm in ['LMC', 'ECMC']:
         for initial_conditions in ['AF_square', 'AF_triangle']:
             kwargs = {'N': N, 'algorithm': algorithm, 'initial_conditions': initial_conditions}
-            fname = join(op_path(rhoH, specif_op='psi_14', **kwargs), 'mean_vs_real.txt')
-            reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
-            psi_avg = np.abs(psi_avg)
-            if algorithm == 'MCMC' and initial_conditions == 'AF_triangle':
-                j = 30
-            else:
-                j = 2
-            hist, bin_edges = np.histogram(psi_avg[j:], np.linspace(0, 1, 101), density=True)
-            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, label=label(algorithm, initial_conditions),
-                     **default_plt_kwargs, zorder=zorder)
+            hists = []
+            op_dir = op_path(rhoH, specif_op='psi_14', **kwargs)
+            files, reals = sort_prefix(op_dir, 'vec_')
+            for k in range(1):
+                psi = np.loadtxt(join(op_dir, files[k]), dtype=complex)
+                hist, bin_edges = np.histogram(np.abs(psi), 50, density=True)
+                hists.append(hist)
+            hist = np.mean(hists, 0)
+            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, plot_str(algorithm, initial_conditions),
+                     label=label(algorithm, initial_conditions), **default_plt_kwargs, zorder=zorder)
             zorder -= 1
     plt.legend(loc=2)
     plt.ylabel('PDF')
-    plt.xlabel('$|\\overline{\\psi_{4}}|$')
+    plt.xlabel('$|\\psi_{4}|$')
     plt.grid()
     plt.savefig('graphs/bench_mark_psi_histograms')
 
     # Figure 3: histogram of z
     plt.figure()
-    for algorithm in ['MCMC', 'ECMC']:
+    for algorithm in ['LMC', 'ECMC']:
         for initial_conditions in ['AF_square', 'AF_triangle']:
             kwargs = {'N': N, 'algorithm': algorithm, 'initial_conditions': initial_conditions}
             sim_path = join(sims_dir, sim_name(rhoH, **kwargs))
             write_or_load = WriteOrLoad(sim_path)
             hists = []
-            for k in range(40):
+            for k in range(60):
                 sp = write_or_load.last_spheres(k)[0]
                 z = sp[:, 2]
                 z = (z - np.mean(z)) * 2 / (np.max(z) - np.min(z))
                 hist, bin_edges = np.histogram(z, 50, density=True)
                 hists.append(hist)
             hist = np.mean(hists, 0)
-            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, label=label(algorithm, initial_conditions),
-                     zorder=zorder, **default_plt_kwargs)
+            plt.plot((bin_edges[:-1] + bin_edges[1:]) / 2, hist, plot_str(algorithm, initial_conditions),
+                     label=label(algorithm, initial_conditions), zorder=zorder, **default_plt_kwargs)
             zorder -= 1
     plt.legend(loc=9)
     plt.ylabel('PDF')
