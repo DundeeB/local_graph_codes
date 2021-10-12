@@ -19,7 +19,7 @@ params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labe
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
 colors_rho = {0.85: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7', 0.79: 'C8', 0.71: 'C9'}
+              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.84: 'C0'}
 direction_colors = {(1, 1): 'b', (1, -1): 'm', (-1, 1): 'g', (-1, -1): 'r', (0, 0): 'gray'}
 
 
@@ -52,13 +52,13 @@ def prepare_lbl(lbl):
     lbl = re.sub('rhoH', '$\\\\rho_H$', lbl)
     if lbl.startswith('psi'):
         for mn in ['14', '23', '16', '4', '6']:
-            lbl = re.sub('psi ' + mn, 'Orientational', lbl)
-            # lbl = re.sub('psi ' + mn, '$g_{' + mn + '}$', lbl)
+            # lbl = re.sub('psi ' + mn, 'Orientational', lbl)
+            lbl = re.sub('psi ' + mn, '$g_{' + mn + '}$', lbl)
     if lbl.startswith('Bragg Sm'):
         lbl = re.sub('Bragg Sm', '$g_k^M$', lbl)
     if lbl.startswith('Bragg S'):
-        lbl = re.sub('Bragg S', 'Positional', lbl)
-        # lbl = re.sub('Bragg S', '$g_k$', lbl)
+        # lbl = re.sub('Bragg S', 'Positional', lbl)
+        lbl = re.sub('Bragg S', '$g_k$', lbl)
     for N, N_ in zip(['10000', '40000', '90000'], ['1e4', '4e4', '9e4']):
         lbl = re.sub(N, N_, lbl)
     return lbl
@@ -129,6 +129,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.xlim(corr_xlim)
     plt.ylabel(prepare_lbl('Bragg_S'))
     plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_pos] + ['$x^{-1/3}$'], loc=3)
+    plt.loglog([50, 50], [0, 1], '--r', **default_plt_kwargs)
     # ax = plt.gca()
     # ax.legend_ = None
 
@@ -137,8 +138,10 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.ylim(corr_ylim)
     plt.xlim(corr_xlim)
     plt.ylabel(prepare_lbl('psi_4'))
-    plt.xlabel('$\Delta$r/$\sigma$')
+    # plt.xlabel('$\Delta$r/$\sigma$')
+    plt.xlabel('r/$\sigma$')
     plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_psi] + ['$x^{-1/4}$'], loc=3)
+    plt.loglog([50, 50], [0, 1], '--r', **default_plt_kwargs)
 
     plt.savefig('graphs/orientation_and_position_corr')
 
@@ -304,14 +307,9 @@ def plt_anneal(rhoH, *args, **kwargs):
     return minf, maxf
 
 
-def frustration(rhoH, frustration_realizations=5, *args, **kwargs):
+def frustration(rhoH, *args, **kwargs):
     op_dir = op_path(rhoH, 'Graph', *args, **kwargs)
-    frustrations = []
-    for i, sp in enumerate(sort_prefix(op_dir, 'frustration_k=4_undirected_')[0]):
-        if i >= frustration_realizations:
-            break
-        frustrations.append(np.loadtxt(join(op_dir, sp)))
-    spheres_frustration = np.mean(frustrations)
+    spheres_frustration = np.loadtxt(join(op_dir, sort_prefix(op_dir, 'frustration_k=4_undirected_')[0][0]))
 
     op_dir = op_path(rhoH, 'Ising_k=4_undirected', *args, **kwargs)
     cv_files, _ = sort_prefix(op_dir, 'Cv_vs_J_')
@@ -332,16 +330,16 @@ def frustration(rhoH, frustration_realizations=5, *args, **kwargs):
     return min_f, spheres_frustration, f_argmaxcv
 
 
-def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
-    plt.rcParams.update({'figure.figsize': (10, 10), 'axes.labelsize': 0.7 * size, 'xtick.labelsize': size * 0.5,
-                         'ytick.labelsize': size * 0.5, 'legend.fontsize': size * 0.6})
+def plot_ising(rhos_heat_capacity=None, plot_heat_capcity=True, *args, **kwargs):
+    plt.rcParams.update({'figure.figsize': (10, 10), 'axes.labelsize': 0.7 * size, 'xtick.labelsize': size * 0.6,
+                         'ytick.labelsize': size * 0.6, 'legend.fontsize': 0.7 * size})
     if not plot_heat_capcity:
-        plt.rcParams.update({'figure.figsize': (8, 8)})
+        plt.rcParams.update({'figure.figsize': (12, 6)})
     plt.figure()
 
     if plot_heat_capcity:
         plt.subplot(211)
-        for rhoH in rhos:
+        for rhoH in rhos_heat_capacity:
             plt_cv(rhoH, *args, **kwargs)
         plt.xlabel('$\\beta$J')
         plt.ylabel('$C_V$/$k_B$')
@@ -351,8 +349,9 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
 
         plt.subplot(212)
     default_plt_kwargs['linewidth'] = 5
-    N9e4dirs = [s for s in os.listdir(sims_dir) if s.startswith('N=9') and s.find('square') > 0]
-    rhos = [float(re.split('(=|_)', dirname)[10]) for dirname in N9e4dirs]
+    # N9e4dirs = [s for s in os.listdir(sims_dir) if s.startswith('N=90000') and s.find('square') > 0]
+    # rhos = [float(re.split('(=|_)', dirname)[10]) for dirname in N9e4dirs]
+    rhos = [0.6] + [np.round(r, 2) for r in np.linspace(0.71, 0.9, 20)]
     ground_state, sphere_frustration, max_cv_frustration = [], [], []
     for rho in rhos:
         try:
@@ -373,8 +372,8 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
     rhos, ground_state, sphere_frustration, max_cv_frustration = filter(np.logical_not(np.isnan(sphere_frustration)),
                                                                         rhos, ground_state, sphere_frustration,
                                                                         max_cv_frustration)
-    plt.plot(rhos, ground_state, 'r', label='$f_\mathrm{frust}$', **default_plt_kwargs)
-    plt.plot(rhos, sphere_frustration, 'm', label='$f_\mathrm{unsat}$', **default_plt_kwargs)
+    plt.plot(rhos, ground_state, 'k', label='$f_\mathrm{frust}$', **default_plt_kwargs)
+    plt.plot(rhos, sphere_frustration, 'b', label='$f_\mathrm{unsat}$', **default_plt_kwargs)
     # plt.plot(rhos, max_cv_frustration, '.k', **default_plt_kwargs)
     # rhos_specific = [0.75, 0.8, 0.85]
     # max_cv_frustration_specific = [f for f, rho in zip(max_cv_frustration, rhos) if rho in rhos_specific]
@@ -402,23 +401,30 @@ def plot_ising(rhos, rhoH_anneal, plot_heat_capcity=True, *args, **kwargs):
     else:
         plt.xlim([0.7, 0.9])
         plt.ylim([0, 0.16])
-    plt.savefig('graphs/Ising' + ('' if plot_heat_capcity else '_without_heat_capacity'))
+    for rho in [0.77, 0.785, 0.83]:
+        plt.plot(2 * [rho], [0, 1], '--g', linewidth=5, zorder=0)
+    ytext = 0.125
+    text_args = {'c': 'g', 'size': 25, 'weight': 'bold'}
+    plt.text(0.835, ytext, 'Solid', **text_args)
+    plt.text(0.79, ytext, 'Tetratic', **text_args)
+    plt.text(0.74, ytext, 'Liquid', **text_args)
+    plt.savefig('graphs/Ising' + ('' if plot_heat_capcity else '_without_heat_capacity') + '_with_phases')
 
-    plt.rcParams.update({'figure.figsize': (10, 7)})
-    plt.figure()
-    plt.grid()
-    plt.xlabel('$\\beta$J')
-    plt.ylabel('$f_\mathrm{unsat}$')
-    i = np.where(rhos == rhoH_anneal)[0][0]
-    J_lim = [1, 3.0]
-    plt.plot(J_lim, 2 * [sphere_frustration[i]], '--k', label='Sphere height', **default_plt_kwargs)
-    minf_anneal, maxf_anneal = plt_anneal(rhoH=rhoH_anneal)
-    minf = min(minf_anneal, sphere_frustration[i])
-    maxf = max(maxf_anneal, sphere_frustration[i])
-    plt.xlim(J_lim)
-    plt.ylim([minf - (maxf - minf) / 5, maxf + (maxf - minf) / 5])
-    plt.legend(loc=3)
-    plt.savefig('graphs/Ising_anneal')
+    # plt.rcParams.update({'figure.figsize': (10, 7)})
+    # plt.figure()
+    # plt.grid()
+    # plt.xlabel('$\\beta$J')
+    # plt.ylabel('$f_\mathrm{unsat}$')
+    # i = np.where(rhos == rhoH_anneal)[0][0]
+    # J_lim = [1, 3.0]
+    # plt.plot(J_lim, 2 * [sphere_frustration[i]], '--k', label='Sphere height', **default_plt_kwargs)
+    # minf_anneal, maxf_anneal = plt_anneal(rhoH=rhoH_anneal)
+    # minf = min(minf_anneal, sphere_frustration[i])
+    # maxf = max(maxf_anneal, sphere_frustration[i])
+    # plt.xlim(J_lim)
+    # plt.ylim([minf - (maxf - minf) / 5, maxf + (maxf - minf) / 5])
+    # plt.legend(loc=3)
+    # plt.savefig('graphs/Ising_anneal')
     return
 
 
@@ -456,7 +462,7 @@ def plot_local_psi_hist(rhos, rad=30, *args, **kwargs):
 
 def plot_magnetic_corr(rhos):
     default_plt_kwargs['linewidth'] = 5
-    plt.rcParams.update({'figure.figsize': (12, 10)})
+    plt.rcParams.update({'figure.figsize': (12, 9)})
     plt.figure()
     corr_ylim = [1e-2, 1]
     corr_xlim = [0.8, 1e2]
@@ -467,6 +473,7 @@ def plot_magnetic_corr(rhos):
     plt.xlim(corr_xlim)
     plt.xlabel('$\Delta$r/$\sigma$')
     plt.ylabel(prepare_lbl('Bragg_Sm'))
+    plt.loglog([50, 50], [0, 1], '--r', **default_plt_kwargs)
     plt.savefig('graphs/magnetic_bragg_corr')
 
 
@@ -494,9 +501,7 @@ def plot_bragg_peak(rhoH, *args, **kwargs):
     plt.savefig('graphs/Bragg_peak')
 
 
-def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', *args, **kwargs):
-    save = False
-    load = True
+def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', save=False, load=True, *args, **kwargs):
     kres = 50
     anglesres = 500
     zero_k_area = 15000
@@ -523,6 +528,8 @@ def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', *args, **kwargs):
             k_ideal = np.sqrt(2) * np.pi / a_0
 
         load_save_path = join(op_path(rhoH, bragg_type, *args, **kwargs), 'local_data')
+        if load and (not os.path.exists(load_save_path)):
+            load = False
         if load:
             kx, ky, S = np.loadtxt(load_save_path, unpack=True, usecols=(0, 1, 2))
         else:
@@ -644,12 +651,9 @@ def plot_psi_convergence(rhos):
     default_plt_kwargs['linewidth'] = 5
 
     def plt_rho(rho, label, s='-', **keywargs):
-        fname = join(op_path(rho, specif_op='psi_14', **keywargs), 'local_mean_vs_real.txt')
-        try:
-            reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
-        except:
-            psi_avg, reals = converge_psi(rho, **keywargs)
-            np.savetxt(fname, np.array([reals, psi_avg]).T)
+        fname = join(op_path(rho, specif_op='psi_14', **keywargs), 'mean_vs_real.txt')
+        reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
+        reals, psi_avg = np.real(reals), np.abs(psi_avg)
         plt.semilogx(reals, psi_avg, s + colors_rho[rho], label=label, **default_plt_kwargs)
 
     for rho in rhos:
@@ -795,11 +799,10 @@ def quiver_cleaned_burgers(rhoH=None, realization=None, pair_cleans_iterations=1
         x1, x2 = xlim_box
         y1, y2 = ylim_box
         plt.plot([x1, x2, x2, x1, x1], [y1, y1, y2, y2, y1], '-k', **default_plt_kwargs)
-
-    # plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy', scale=1,
-    #            label='Burger field', width=arrow_width, zorder=7)
-    # plt.plot(burg[:, 0] / 2, burg[:, 1] / 2, '.', markersize=5, color='red', zorder=7)
-    # Fig 3
+    if not plot_for_paper:
+        plt.quiver(burg[:, 0] / 2, burg[:, 1] / 2, burg[:, 2] / 2, burg[:, 3] / 2, angles='xy', scale_units='xy',
+                   scale=1,
+                   label='Burger field', width=arrow_width, zorder=7)
     plt.title(('Microscopic Burgers' if pair_cleans_iterations == 0
                else ('Pair Cleaned ' + str(pair_cleans_iterations) + ' times')) + \
               ('' if (not clean_by_cluster_flag) else ', cluster cleaned D=' + str(int(
@@ -972,7 +975,7 @@ def bench_mark():
     N, rhoH = 900, 0.8
 
     def label(aglorithm, ic):
-        alg_lbl = 'Metropolis (Local MC)' if algorithm == 'LMC' else 'Event Chain MC'
+        alg_lbl = 'Metropolis' if algorithm == 'LMC' else 'Event Chain MC'
         ic_lbl = 'square' if initial_conditions == 'AF_square' else 'honeycomb'
         return alg_lbl + ', ic=' + ic_lbl
 
@@ -1050,32 +1053,61 @@ def bench_mark():
 
 
 if __name__ == "__main__":
+    """
+    To recreate paper & supplement graphs, run this code after downloading the data and changing the variable
+    'sims_dir' above to the appropriate path. Some of the figures, such as Fig. 1 In the paper, where created using a
+    power point presentation, and the codes do not recreate them. Do feel free to contact us: ligolas@gmail.com.
+    """
+
     rhoH_tetratic = 0.81
-    realization = 94363239  # 0.81: 47424146, 92347176, 94363239  # 0.8: 92549977, 64155333  #
+    realization = 94363239
 
-    # Plot global burger field before and after cleaning - Fig. 3
-    # xlim, ylim = [120, 147], [30, 46]
-    # coarse_grain_burgers(rhoH_tetratic, realization=realization, xlim=[0, 260], ylim=[0, 260], distance_threshold=10,
-    #                      overwrite_cluster_clean=False, plot_for_paper=True, box=[xlim, ylim])
+    """ Fig. 2 - correlations """
+    plot_pos_and_orientation([0.84, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
 
-    # Plot zoom-in in Fig. 3
-    # quiver_burger(rhoH_tetratic, xlim, ylim, realization=realization, given_color='gray')
-    # quiver_burger(rhoH_tetratic, xlim, ylim, bonds=False, plot_centers=False, frustrated_bonds=False,
-    #               realization=realization, quiv_surfix='_paired-4_clustered-D=10', new_fig=False)
+    """ Fig. 3 - Plot global burger field before and after cleaning """
+    x_lim_zoom_in, y_lim_zoom_in = [120, 147], [30, 46]
+    coarse_grain_kwargs = {'xlim': [0, 260], 'ylim': [0, 260], 'distance_threshold': 10}  # 10 = 5 * sigma
+    coarse_grain_burgers(rhoH_tetratic, realization=realization, plot_for_paper=True,
+                         box=[x_lim_zoom_in, y_lim_zoom_in], **coarse_grain_kwargs)
+    quiver_burger(rhoH_tetratic, x_lim_zoom_in, y_lim_zoom_in, realization=realization, given_color='gray')
+    quiver_burger(rhoH_tetratic, x_lim_zoom_in, y_lim_zoom_in, bonds=False, plot_centers=False, frustrated_bonds=False,
+                  realization=realization, quiv_surfix='_paired-4_clustered-D=10', new_fig=False)
 
-    # coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
+    """ Fig 4 """
+    plot_ising(plot_heat_capcity=False)
 
-    # plot_pos_and_orientation([0.85, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
-    # plot_ising([0.85, rhoH_tetratic, 0.75], rhoH_anneal=rhoH_tetratic, plot_heat_capcity=False)
-    # plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77]))
-    # plot_magnetic_corr([0.85, 0.83, rhoH_tetratic, 0.77])
-    # plot_bragg_peak(0.75)
-    # for bragg_type in ['Bragg_Sm', 'Bragg_S']:
-    #     plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
-    # plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
-    # plot_annealing(rhoH_tetratic)  # , real=realization)
-    # plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
+    """
+    Supplement - Figs. 2,4-11,14-19. The rest of the codes need some adaption in order to recreate the graphs.
+    The ECMC vs analytic solution is completely not here, but in a different matlab repository that can be found in my
+    github user (DundeeB).
+    """
+    plot_psi_convergence(np.unique([0.83, rhoH_tetratic, 0.8, 0.78]))
     bench_mark()
+    plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
+    for bragg_type in ['Bragg_S', 'Bragg_Sm']:
+        plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
+    plot_magnetic_corr([0.84, 0.83, rhoH_tetratic, 0.77])
+    plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.785, 0.78, 0.775, 0.77]))
+
+    """
+    In the following Burgers field coarse graining graphs, the color scheme is different then in some of the graphs in
+    the supplement. The color scheme used there is a 'no color scheme' version, where colors represent different
+    clusters. Later on we changed the color scheme to correspond to the total Burgers field charge (see
+    'associate_color' function)
+    """
+    coarse_grain_burgers(rhoH_tetratic, realization=realization, **coarse_grain_kwargs)
+    coarse_grain_burgers(rhoH_tetratic, realization=92347176, **coarse_grain_kwargs)
+    coarse_grain_burgers(rhoH_tetratic, realization=47424146, plot_for_paper=True, **coarse_grain_kwargs)
+    for rho, real in zip([0.83, 0.84], [94861187, 95524231]):
+        """
+        rho=0.85 gives empty cleaned Burgers field, so the plotting code does not work.
+        For rho=0.82 use realization 94818416
+        """
+        coarse_grain_burgers(rho, realization=real, plot_for_paper=True, **coarse_grain_kwargs)
+    coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
+
+    # TODO: replot correlations when finished: Bragg_S rhoH=0.8[45], psi_14 for rhoH=0.7[78], LocalPsi 0.7{85,8,75,77}.
+    # TODO: Debug LocalPsi it does not run properly.
     print('Finished succesfully!')
     plt.show()
-# TODO: understand why 0.81<=rho_H<=0.83 runs of annealing Ising did not save any anneal file
