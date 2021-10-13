@@ -110,7 +110,7 @@ def plot_corr(rhoH, specific_op, realizations=1, poly_slope=None, single_slope_l
                 y_init = maxys[i - 1]
                 x_init = maxxs[i - 1]
         y = y_init * np.power(x / x_init, -poly_slope)
-        lbl = '$x^{-1/4\ or -1/3}$' if not single_slope_label else '$x^{-' + str(np.round(poly_slope, 2)) + '}$'
+        lbl = '$r^{-1/4\ or -1/3}$' if not single_slope_label else '$r{-' + str(np.round(poly_slope, 2)) + '}$'
         plt.loglog(x, y, '--k', label=lbl, **default_plt_kwargs)
     plt.grid()
     plt.legend(loc=4)
@@ -128,7 +128,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.ylim(corr_ylim)
     plt.xlim(corr_xlim)
     plt.ylabel(prepare_lbl('Bragg_S'))
-    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_pos] + ['$x^{-1/3}$'], loc=3)
+    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_pos] + ['$r^{-1/3}$'], loc=3)
     plt.loglog([60, 60], [0, 1], '--r', **default_plt_kwargs)
     # ax = plt.gca()
     # ax.legend_ = None
@@ -140,7 +140,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     plt.ylabel(prepare_lbl('psi_4'))
     # plt.xlabel('$\Delta$r/$\sigma$')
     plt.xlabel('r/$\sigma$')
-    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_psi] + ['$x^{-1/4}$'], loc=3)
+    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_psi] + ['$r^{-1/4}$'], loc=3)
     plt.loglog([60, 60], [0, 1], '--r', **default_plt_kwargs)
 
     plt.savefig('graphs/orientation_and_position_corr')
@@ -468,7 +468,7 @@ def plot_magnetic_corr(rhos):
     corr_xlim = [0.8, 1e2]
 
     plot_corr(rhos, 'Bragg_Sm', poly_slope=1.0 / 6, single_slope_label=True)
-    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos] + ['$x^{-1/6}$'])
+    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos] + ['$r^{-1/6}$'])
     plt.ylim(corr_ylim)
     plt.xlim(corr_xlim)
     plt.xlabel('r/$\sigma$')
