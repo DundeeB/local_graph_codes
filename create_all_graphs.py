@@ -19,7 +19,7 @@ params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labe
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
 colors_rho = {0.84: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'm'}
+              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'gray'}
 direction_colors = {(1, 1): 'b', (1, -1): 'm', (-1, 1): 'g', (-1, -1): 'r', (0, 0): 'gray'}
 
 
@@ -467,8 +467,8 @@ def plot_magnetic_corr(rhos):
     corr_ylim = [1e-2, 1]
     corr_xlim = [0.8, 1e2]
 
-    plot_corr(rhos, 'Bragg_Sm', poly_slope=1.0 / 3, single_slope_label=True)
-    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos] + ['$x^{-1/3}$'])
+    plot_corr(rhos, 'Bragg_Sm', poly_slope=1.0 / 6, single_slope_label=True)
+    plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos] + ['$x^{-1/6}$'])
     plt.ylim(corr_ylim)
     plt.xlim(corr_xlim)
     plt.xlabel('r/$\sigma$')
@@ -1063,7 +1063,7 @@ if __name__ == "__main__":
     realization = 94363239
 
     """ Fig. 2 - correlations """
-    plot_pos_and_orientation([0.84, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
+    plot_pos_and_orientation([0.85, 0.84, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
     # 0.85? Shows such a slow algebraic decay it looks like long range order!
 
     """ Fig. 3 - Plot global burger field before and after cleaning """
@@ -1088,7 +1088,7 @@ if __name__ == "__main__":
     plot_z_histogram([0.71, 0.78, rhoH_tetratic, 0.85])
     for bragg_type in ['Bragg_S', 'Bragg_Sm']:
         plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type=bragg_type)
-    plot_magnetic_corr([0.84, 0.83, rhoH_tetratic, 0.77])
+    plot_magnetic_corr([0.85, 0.84, 0.83, rhoH_tetratic, 0.77])
     plot_local_psi_hist(np.unique([rhoH_tetratic, 0.8, 0.79, 0.785, 0.78, 0.775, 0.77])[-1::-1])
 
     """
