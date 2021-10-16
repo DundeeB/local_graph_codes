@@ -577,7 +577,8 @@ def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', save=False, load=True
             idx = S.argsort()
             kx, ky, S = kx[idx], ky[idx], S[idx]
         vmax = np.max([S_ for (k_, S_) in zip(np.sqrt(kx ** 2 + ky ** 2), S) if k_ > 0.5 * k_ideal])
-        plt.scatter(a_0 * kx / (2 * np.pi), a_0 * ky / (2 * np.pi), c=S, s=3, vmin=0, vmax=vmax)
+        # plt.scatter(a_0 * kx / (2 * np.pi), a_0 * ky / (2 * np.pi), c=S, s=3, vmin=0, vmax=vmax)
+        plt.scatter(a_0 * kx / (2 * np.pi), a_0 * ky / (2 * np.pi), c=np.log(S), s=3, vmin=0, vmax=np.log(vmax))
         if save:
             # append([k[0], k[1], S_])
             np.savetxt(load_save_path,
