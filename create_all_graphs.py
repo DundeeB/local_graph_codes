@@ -19,7 +19,7 @@ params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labe
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
 colors_rho = {0.84: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'gray'}
+              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'C0', 0.82: 'yellow'}
 direction_colors = {(1, 1): 'b', (1, -1): 'm', (-1, 1): 'g', (-1, -1): 'r', (0, 0): 'gray'}
 
 
@@ -141,6 +141,7 @@ def plot_pos_and_orientation(rhos_pos, rhos_psi):
     # plt.xlabel('$\Delta$r/$\sigma$')
     plt.xlabel('r/$\sigma$')
     plt.legend([prepare_lbl('rhoH=' + str(r)) for r in rhos_psi] + ['$r^{-1/4}$'], loc=3)
+    # plt.legend([prepare_lbl('rhoH=' + str(r)) if r not in rhos_pos else '_nolegend_' for r in rhos_psi] + ['$r^{-1/4}$'], loc=3)
     plt.loglog([60, 60], [0, 1], '--r', **default_plt_kwargs)
 
     plt.savefig('graphs/orientation_and_position_corr')
@@ -586,6 +587,74 @@ def plot_color_bargg_peaks(rhoH_vec, bragg_type='Bragg_S', save=False, load=True
     plt.savefig('graphs/color_' + bragg_type)
 
 
+def gradients_around_optimal_k(rhoH_vec, bragg_type='Bragg_Sm', overwrite=False):
+    plt.rcParams.update({'figure.figsize': (20, 10), 'axes.labelsize': 0.6 * size, 'xtick.labelsize': size * 0.6,
+                         'ytick.labelsize': size * 0.6, 'legend.fontsize': size * 0.6, 'axes.titlesize': size * 0.6})
+    fig = plt.figure()
+    res = 501
+    k_factor_span = 0.02
+    angle_span = 0.1
+    for rhoH in rhoH_vec:
+        sim_path = join(sims_dir, sim_name(rhoH))
+        psi = PsiMN(sim_path, 1, 4)
+        psi.read_or_calc_write()
+        print(psi.spheres_ind)
+        _, sp = psi.rotate_spheres()
+        sp = np.array(sp)
+        x = sp[:, 0]
+        y = sp[:, 1]
+        z = sp[:, 2]
+        z = (z - np.mean(z)) * 2 / (np.max(z) - np.min(z))
+        N = 90000
+
+        def S_func(k):
+            phase = k[0] * x + k[1] * y
+            if bragg_type == 'Bragg_S':
+                S = 1 / N * (np.sum(np.cos(phase)) ** 2 + np.sum(np.sin(phase)) ** 2)
+            elif bragg_type == 'Bragg_Sm':
+                S = 1 / N * (np.sum(z * np.cos(phase)) ** 2 + np.sum(z * np.sin(phase)) ** 2)
+            return S
+
+        load_save_path = join(op_path(rhoH, bragg_type), 'local_data')
+        kx, ky, S = np.loadtxt(load_save_path, unpack=True, usecols=(0, 1, 2))
+        i_max = np.argmax(S)
+        k_rad_max = np.sqrt(kx[i_max] ** 2 + ky[i_max] ** 2)
+        k_angle = np.arctan2(ky[i_max], kx[i_max])
+
+        load_radial_azimuthal_path = join(op_path(rhoH, bragg_type), 'radial_azimuthal_local_data')
+        if (not overwrite) and os.path.exists(load_radial_azimuthal_path):
+            angles, k_rads, S_angles, S_rads = np.loadtxt(load_radial_azimuthal_path, unpack=True, usecols=(0, 1, 2, 3))
+        else:
+            angles = k_angle + np.linspace(-angle_span, angle_span, res)
+            S_angles = []
+            for angle in angles:
+                S_angles.append(S_func([k_rad_max * np.cos(angle), k_rad_max * np.sin(angle)]))
+            k_rads = k_rad_max * np.linspace(1 - k_factor_span, 1 + k_factor_span, res)
+            S_rads = []
+            for k_rad in k_rads:
+                S_rads.append(S_func([k_rad * np.cos(k_angle), k_rad * np.sin(k_angle)]))
+            np.savetxt(load_radial_azimuthal_path,
+                       np.array([[angles[i], k_rads[i], S_angles[i], S_rads[i]] for i in range(res)]))
+
+        plt.subplot(2, 1, 1)
+        plt.xlabel('Azimuthal deviation from maximum [radians]')
+        plt.ylabel('$S$/$S_{max}$')
+        plt.grid('on')
+        plt.semilogy(angles - k_angle, np.array(S_angles) / np.max(S),
+                     label='$\\rho_H=$' + str(rhoH) + ', $S_{max}=$' + str(int(np.max(S))))
+        plt.ylim([1 / N, 1])
+        plt.legend(loc=1)
+
+        plt.subplot(2, 1, 2)
+        plt.xlabel('Radial factor from maximum $|k|$/$|k_{max}|$')
+        plt.ylabel('$S$/$S_{max}$')
+        plt.grid('on')
+        plt.semilogy(k_rads / k_rad_max, np.array(S_rads) / np.max(S),
+                     label='$\\rho_H=$' + str(rhoH) + ', $S_{max}=$' + str(int(np.max(S))))
+        plt.ylim([1 / N, 1])
+    plt.savefig('graphs/gradients_' + bragg_type)
+
+
 def plot_z_histogram(rhoH_vec, *args, **kwargs):
     plt.rcParams.update(params)
     plt.rcParams.update({'figure.figsize': (10, 10)})
@@ -642,34 +711,47 @@ def converge_psi(rhoH, *args, **kwargs):
     return psi_avg, reals
 
 
-def plot_psi_convergence(rhos):
+def plot_psi_convergence(rhos, orientation=False):
     # params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size,
     #           'axes.titlesize': size,
     #           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
     plt.rcParams.update(params)
-    plt.rcParams.update({'figure.figsize': (10, 10), 'legend.fontsize': size * 0.6})
+    plt.rcParams.update({'figure.figsize': (10 if not orientation else 20, 10), 'legend.fontsize': size * 0.6})
     plt.figure()
     default_plt_kwargs['linewidth'] = 5
 
     def plt_rho(rho, label, s='-', **keywargs):
         fname = join(op_path(rho, specif_op='psi_14', **keywargs), 'mean_vs_real.txt')
         reals, psi_avg = np.loadtxt(fname, dtype=complex, unpack=True, usecols=(0, 1))
-        reals, psi_avg = np.real(reals), np.abs(psi_avg)
-        plt.semilogx(reals, psi_avg, s + colors_rho[rho], label=label, **default_plt_kwargs)
+        if not orientation:
+            reals, psi_avg = np.real(reals), np.abs(psi_avg)
+            plot_func = plt.semilogx
+        else:
+            reals, psi_avg = np.real(reals), np.real(np.log(psi_avg / np.abs(psi_avg)) / 4j)
+            span = np.max(np.abs(psi_avg))
+            psi_avg = psi_avg / span
+            label += ', span=' + str(np.round(span, 4))
+            plot_func = plt.plot
+        plot_func(reals, psi_avg, s, color=colors_rho[rho], label=label, **default_plt_kwargs)
 
     for rho in rhos:
         rho_str = str(rho) if rho != 0.8 else '0.80'
-        plt_rho(rho, prepare_lbl('rhoH=' + rho_str) + ', square ic, N=90,000')
+        plt_rho(rho, prepare_lbl('rhoH=' + rho_str) + (', square ic, N=90,000' if not orientation else ''))
         # plt_rho(rho, '        honeycomb ic, N=40,000', s='--', initial_conditions='AF_triangle', N=4e4)
-        plt_rho(rho, 'honeycomb ic, N=40,000', s='--', initial_conditions='AF_triangle', N=4e4)
+        if not orientation:
+            plt_rho(rho, 'honeycomb ic, N=40,000', s='--', initial_conditions='AF_triangle', N=4e4)
         # plt_rho(rho, prepare_lbl('rhoH=' + str(rho)) + ', square ic')
         # plt_rho(rho, 'honeycomb ic', s='--', initial_conditions='AF_triangle')
-    plt.legend(loc=1)
+    plt.legend(loc=1 if not orientation else 0)
     plt.xlabel('realization')
-    plt.ylabel('$|\\overline{\\psi_{4}}|$')
-    plt.ylim([0, 1.4])
+    plt.ylabel(
+        '$|\\overline{\\psi_{4}}|$' if not orientation else 'Normalized sample orientation $\\theta=\\frac{1}{4i}log' +
+                                                            '\\left(\\frac{\\overline{\\psi_{4}}}{|\\overline' +
+                                                            '{\\psi_{4}}|}\\right)$')
+    if not orientation:
+        plt.ylim([0, 1.4])
     plt.grid()
-    plt.savefig('graphs/psi_convergence')
+    plt.savefig('graphs/' + ('psi_convergence' if not orientation else 'sample_orientation'))
 
 
 def undirected_pairs_graph(X, l_x, l_y):
@@ -1076,7 +1158,7 @@ if __name__ == "__main__":
     quiver_burger(rhoH_tetratic, x_lim_zoom_in, y_lim_zoom_in, bonds=False, plot_centers=False, frustrated_bonds=False,
                   realization=realization, quiv_surfix='_paired-4_clustered-D=10', new_fig=False)
 
-    """ Fig 4 """
+    """ Fig 5 """
     plot_ising(plot_heat_capcity=False)
 
     """
@@ -1108,6 +1190,10 @@ if __name__ == "__main__":
         """
         coarse_grain_burgers(rho, realization=real, plot_for_paper=True, **coarse_grain_kwargs)
     coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
+
+
+    # gradients_around_optimal_k([0.75, 0.78, 0.81, 0.85])
+    # plot_psi_convergence([0.75, 0.85, 0.78, 0.81], orientation=True)
 
     print('Finished succesfully!')
     plt.show()
