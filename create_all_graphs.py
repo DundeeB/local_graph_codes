@@ -12,7 +12,7 @@ from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import *
 
-sims_dir = '..\\from_ATLAS'
+sims_dir = '..\\from_ATLAS3.0'
 default_plt_kwargs = {'linewidth': 5, 'markersize': 10}
 size = 30
 params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size, 'axes.titlesize': size,
