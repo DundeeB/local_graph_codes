@@ -3,7 +3,7 @@ import numpy as np
 import os, re
 from sys import path as syspath
 
-syspath.append('C:\\Users\\Daniel Abutbul\\OneDrive - Technion\\OOP_hard_sphere_event_chain')
+syspath.append('..\\OOP_hard_sphere_event_chain')
 from post_process import Ising, Graph, PsiMN
 from SnapShot import WriteOrLoad
 from mpl_toolkits import mplot3d
@@ -12,14 +12,14 @@ from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import kneighbors_graph
 from sklearn.cluster import *
 
-sims_dir = 'C:\\Users\\Daniel Abutbul\\OneDrive - Technion\\post_process\\from_ATLAS3.0'
+sims_dir = '..\\from_ATLAS'
 default_plt_kwargs = {'linewidth': 5, 'markersize': 10}
 size = 30
 params = {'legend.fontsize': size * 0.75, 'figure.figsize': (10, 10), 'axes.labelsize': size, 'axes.titlesize': size,
           'xtick.labelsize': size * 0.75, 'ytick.labelsize': size * 0.75}
 plt.rcParams.update(params)
 colors_rho = {0.84: 'C0', 0.83: 'C1', 0.81: 'C2', 0.8: 'C9', 0.78: 'C3', 0.77: 'C4', 0.785: 'C5', 0.775: 'C6',
-              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'C0', 0.82: 'yellow'}
+              0.75: 'C7', 0.79: 'C8', 0.71: 'C9', 0.85: 'gray', 0.82: 'yellow'}
 direction_colors = {(1, 1): 'b', (1, -1): 'm', (-1, 1): 'g', (-1, -1): 'r', (0, 0): 'gray'}
 
 
@@ -1146,8 +1146,7 @@ if __name__ == "__main__":
     realization = 94363239
 
     """ Fig. 2 - correlations """
-    plot_pos_and_orientation([0.85, 0.84, 0.83, rhoH_tetratic], [rhoH_tetratic, 0.78, 0.77])
-    # 0.85? Shows such a slow algebraic decay it looks like long range order!
+    plot_pos_and_orientation([0.85, 0.84, 0.83, 0.82, rhoH_tetratic], [rhoH_tetratic, 0.8, 0.79, 0.78, 0.77])
 
     """ Fig. 3 - Plot global burger field before and after cleaning """
     x_lim_zoom_in, y_lim_zoom_in = [120, 147], [30, 46]
@@ -1158,8 +1157,12 @@ if __name__ == "__main__":
     quiver_burger(rhoH_tetratic, x_lim_zoom_in, y_lim_zoom_in, bonds=False, plot_centers=False, frustrated_bonds=False,
                   realization=realization, quiv_surfix='_paired-4_clustered-D=10', new_fig=False)
 
-    """ Fig 5 """
+    """ Fig 4 and Fig 5 Magnetic Structure"""
+    plot_color_bargg_peaks([0.75, 0.78, rhoH_tetratic, 0.85], bragg_type="Bragg_Sm")
+
+    """ Fig 5 Ising part"""
     plot_ising(plot_heat_capcity=False)
+
 
     """
     Supplement - Figs. 2,4-11,14-19. The rest of the codes need some adaption in order to recreate the graphs.
@@ -1191,7 +1194,7 @@ if __name__ == "__main__":
         coarse_grain_burgers(rho, realization=real, plot_for_paper=True, **coarse_grain_kwargs)
     coarse_grain_null_model(ref_rhoH=rhoH_tetratic, ref_real=realization, distance_threshold=10)
 
-
+    # """Used for extra test we performed later, graphs does not exist in paper or supplemental:"""
     # gradients_around_optimal_k([0.75, 0.78, 0.81, 0.85])
     # plot_psi_convergence([0.75, 0.85, 0.78, 0.81], orientation=True)
 
